@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Release to the Moon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night-top: #0a0e1c;
+    --night-bottom: #131c33;
+    --moon-core: #fff8ea;
+    --moon-edge: #e9dcc0;
+    --berry: #b23a52;
+    --berry-soft: rgba(178,58,82,0.55);
+    --ink: #d9dce8;
+    --whisper: #7c8299;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body{
+    margin:0; padding:0; width:100%; height:100%;
+    background: radial-gradient(ellipse at 50% 20%, var(--night-bottom) 0%, var(--night-top) 70%);
+    overflow:hidden;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    color: var(--ink);
+    user-select:none;
+  }
+  #stage{
+    position:relative; width:100vw; height:100vh;
+    display:flex; align-items:center; justify-content:center;
+  }
+  canvas#stars{ position:absolute; inset:0; width:100%; height:100%; }
+  canvas#particles{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+  #moon-wrap{
+    position:absolute;
+    top:50%; left:50%;
+    transform: translate(-50%,-50%);
+    width: 34vmin; height:34vmin;
+    z-index:2;
+  }
+  #moon-glow{
+    position:absolute; inset:-40%;
+    border-radius:50%;
+    background: radial-gradient(circle, rgba(255,248,234,0.35) 0%, rgba(255,248,234,0.08) 45%, rgba(255,248,234,0) 70%);
+    animation: breathe 6s ease-in-out infinite;
+  }
+  #moon{
+    position:absolute; inset:0;
+    border-radius:50%;
+    background: radial-gradient(circle at 38% 35%, var(--moon-core) 0%, var(--moon-edge) 60%, #cbb98e 100%);
+    box-shadow: 0 0 60px rgba(255,248,234,0.25);
+    animation: breathe 6s ease-in-out infinite;
+  }
+  @keyframes breathe{
+    0%,100%{ filter:brightness(1); }
+    50%{ filter:brightness(1.08); }
+  }
+  #moon.lit{
+    box-shadow: 0 0 110px rgba(255,248,234,0.55), 0 0 200px rgba(178,58,82,0.15);
+  }
+
+  #text-layer{
+    position:absolute;
+    top:0; left:0; width:100%; height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    padding: 0 8vw 9vh 8vw;
+    z-index:5;
+    pointer-events:none;
+  }
+  .line{
+    font-family:'Shippori Mincho', serif;
+    font-size: clamp(17px, 2.6vmin, 24px);
+    line-height:1.9;
+    text-align:center;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    opacity:0;
+    transition: opacity 2.2s ease;
+    max-width: 620px;
+  }
+  .line.show{ opacity:1; }
+  .micro{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:300;
+    font-size: clamp(11px, 1.6vmin, 13px);
+    color: var(--whisper);
+    letter-spacing:0.08em;
+    margin-top:14px;
+    opacity:0;
+    transition: opacity 1.8s ease;
+  }
+  .micro.show{ opacity:1; }
+
+  #choice-row{
+    display:flex; gap:16px; margin-top:26px;
+    opacity:0; transform:translateY(6px);
+    transition: opacity 1.4s ease, transform 1.4s ease;
+    pointer-events:none;
+  }
+  #choice-row.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+  .choice-btn{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:300;
+    font-size: clamp(12px, 1.7vmin, 14px);
+    letter-spacing:0.06em;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid rgba(217,220,232,0.35);
+    border-radius: 999px;
+    padding: 11px 26px;
+    cursor:pointer;
+    transition: border-color 0.6s ease, background 0.6s ease;
+  }
+  .choice-btn:hover{ border-color: rgba(217,220,232,0.75); background: rgba(217,220,232,0.06); }
+  .choice-btn.berry{ border-color: var(--berry-soft); }
+  .choice-btn.berry:hover{ background: rgba(178,58,82,0.1); border-color: var(--berry); }
+
+  #input-row{
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+    margin-top:24px;
+    opacity:0; max-height:0; overflow:hidden;
+    transition: opacity 1s ease;
+    pointer-events:none;
+    width:100%;
+  }
+  #input-row.show{ opacity:1; max-height:200px; pointer-events:auto; }
+  #word-input{
+    font-family:'Shippori Mincho', serif;
+    font-size: clamp(15px, 2vmin, 18px);
+    background: transparent;
+    border:none;
+    border-bottom: 1px solid rgba(217,220,232,0.4);
+    color: var(--ink);
+    text-align:center;
+    padding: 8px 4px;
+    width: min(85vw, 420px);
+    outline:none;
+    letter-spacing:0.04em;
+  }
+  #word-input::placeholder{ color: rgba(217,220,232,0.3); }
+  #submit-word{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:300;
+    font-size: clamp(11px, 1.5vmin, 13px);
+    letter-spacing:0.08em;
+    background: none; border:none; color: var(--whisper);
+    cursor:pointer; padding:4px 10px;
+    transition: color 0.5s ease;
+  }
+  #submit-word:hover{ color: var(--ink); }
+
+  #tap-hint{
+    position:absolute; bottom:5vh; left:50%; transform:translateX(-50%);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:300;
+    font-size: 11px;
+    letter-spacing:0.1em;
+    color: rgba(124,130,153,0.55);
+    opacity:0;
+    transition: opacity 2s ease;
+    z-index:6;
+    animation: pulse 3.5s ease-in-out infinite;
+  }
+  #tap-hint.show{ opacity:1; }
+  @keyframes pulse{
+    0%,100%{ opacity:0.35; } 50%{ opacity:0.75; }
+  }
+
+  #privacy{
+    position:absolute; top:3vh; left:50%; transform:translateX(-50%);
+    font-size:10px; letter-spacing:0.05em; color: rgba(124,130,153,0.4);
+    text-align:center; max-width:80vw; z-index:6;
+    font-family:'Zen Kaku Gothic New', sans-serif; font-weight:300;
+  }
+
+  #floating-word{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-family:'Shippori Mincho', serif;
+    font-size: clamp(16px, 2.4vmin, 20px);
+    color: rgba(217,220,232,0.9);
+    opacity:0; z-index:4; letter-spacing:0.05em;
+    pointer-events:none; white-space:nowrap;
+  }
+
+  /* ---------- 満月の夜だけの隠し演出 ---------- */
+  #hidden-scene{
+    position:absolute; inset:0; z-index:8;
+    opacity:0; pointer-events:none;
+    transition: opacity 3s ease;
+    background: linear-gradient(180deg, rgba(10,14,28,0) 0%, rgba(10,14,28,0.55) 60%, rgba(10,14,28,0.85) 100%);
+  }
+  #hidden-scene.show{ opacity:1; pointer-events:auto; }
+
+  #hills{
+    position:absolute; bottom:0; left:0; width:100%; height:28vh;
+    background: linear-gradient(180deg, rgba(70,80,110,0.0) 0%, rgba(45,54,82,0.55) 100%);
+    clip-path: path('M0,90 C 150,40 300,110 480,60 C 660,15 820,95 1000,50 C 1150,15 1300,70 1440,45 L1440,200 L0,200 Z');
+    opacity:0.85;
+  }
+  #susuki{
+    position:absolute; bottom:0; left:0; width:100%; height:16vh;
+    background: linear-gradient(180deg, rgba(180,175,150,0.0) 0%, rgba(60,58,48,0.5) 100%);
+    clip-path: polygon(
+      0% 100%, 0% 60%, 3% 40%, 6% 65%, 9% 35%, 12% 62%, 16% 30%, 20% 60%,
+      24% 42%, 28% 65%, 33% 38%, 38% 62%, 44% 32%, 50% 60%, 56% 40%,
+      62% 63%, 68% 34%, 74% 60%, 80% 42%, 86% 65%, 92% 36%, 96% 60%, 100% 45%, 100% 100%
+    );
+    animation: sway 7s ease-in-out infinite;
+    transform-origin: bottom center;
+  }
+  @keyframes sway{
+    0%,100%{ transform: skewX(0deg); }
+    50%{ transform: skewX(0.6deg); }
+  }
+  #hidden-text{
+    position:absolute; top:14%; left:50%; transform:translateX(-50%);
+    text-align:center; width:80%; max-width:520px;
+    font-family:'Shippori Mincho', serif;
+    font-size: clamp(14px, 2vmin, 17px);
+    line-height:2;
+    color: rgba(217,220,232,0.85);
+  }
+  #sound-toggle{
+    position:absolute; bottom:6vh; left:50%; transform:translateX(-50%);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:300; font-size:12px; letter-spacing:0.08em;
+    background:none; border:1px solid rgba(217,220,232,0.35);
+    color:var(--ink); border-radius:999px; padding:9px 22px;
+    cursor:pointer;
+  }
+  #sound-toggle:hover{ border-color: rgba(217,220,232,0.7); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="stars"></canvas>
+  <div id="moon-wrap">
+    <div id="moon-glow"></div>
+    <div id="moon"></div>
+  </div>
+  <canvas id="particles"></canvas>
+  <div id="floating-word"></div>
+
+  <div id="privacy">This stays only within you. Nothing you write is ever sent or saved.</div>
+
+  <div id="text-layer">
+    <p class="line" id="line-main"></p>
+    <p class="micro" id="line-micro"></p>
+    <div id="choice-row">
+      <button class="choice-btn berry" id="btn-write">Write</button>
+      <button class="choice-btn" id="btn-close">Gently close</button>
+    </div>
+    <div id="input-row">
+      <input type="text" id="word-input" placeholder="just a word" maxlength="40">
+      <button id="submit-word">Send it to the moon</button>
+    </div>
+  </div>
+  <div id="tap-hint">Touch the screen to continue</div>
+
+  <div id="hidden-scene">
+    <div id="hills"></div>
+    <div id="susuki"></div>
+    <div id="hidden-text">
+      Under the same full moon, on distant Highland hills,<br>
+      and in fields of pampas grass, people danced.<br>
+      They were looking up at the same moon.
+    </div>
+    <button id="sound-toggle">Listen, softly</button>
+  </div>
+  <audio id="furusato-audio" src="audio/furusato-no-sora.mp3" preload="none" loop></audio>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- 星の背景 ----------
+  const starsCanvas = document.getElementById('stars');
+  const sctx = starsCanvas.getContext('2d');
+  const particlesCanvas = document.getElementById('particles');
+  const pctx = particlesCanvas.getContext('2d');
+  let W, H, DPR;
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    [starsCanvas, particlesCanvas].forEach(c=>{
+      c.width = W*DPR; c.height = H*DPR;
+      c.style.width = W+"px"; c.style.height = H+"px";
+    });
+    sctx.setTransform(DPR,0,0,DPR,0,0);
+    pctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const stars = [];
+  const STAR_COUNT = 140;
+  for(let i=0;i<STAR_COUNT;i++){
+    stars.push({
+      x: Math.random()*W,
+      y: Math.random()*H*0.85,
+      r: Math.random()*1.3 + 0.2,
+      baseA: Math.random()*0.6+0.15,
+      tw: Math.random()*Math.PI*2,
+      speed: Math.random()*0.02+0.005
+    });
+  }
+
+  function drawStars(t){
+    sctx.clearRect(0,0,W,H);
+    stars.forEach(s=>{
+      const a = s.baseA + Math.sin(t*s.speed + s.tw)*0.2;
+      sctx.beginPath();
+      sctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      sctx.fillStyle = `rgba(230,235,250,${Math.max(0,a)})`;
+      sctx.fill();
+    });
+  }
+
+  // ---------- 粒子（ラズベリーの光 / 解放の光）----------
+  let particles = [];
+  function spawnBerry(x,y){
+    particles.push({
+      type:'berry',
+      x, y, targetY:y,
+      r: 0,
+      maxR: Math.random()*2.5+2.5,
+      a:0,
+      life:0,
+      phase:'grow'
+    });
+  }
+  function spawnRelease(x,y,isBerry){
+    particles.push({
+      type: isBerry ? 'berry-release' : 'light',
+      x, y,
+      vx: (Math.random()-0.5)*0.3,
+      vy: -(Math.random()*0.6+0.35),
+      r: isBerry ? (Math.random()*2+2) : (Math.random()*1.5+0.6),
+      a: 1,
+      life:0
+    });
+  }
+
+  function updateParticles(){
+    pctx.clearRect(0,0,W,H);
+    particles = particles.filter(p=>{
+      p.life += 1;
+      if(p.type==='berry'){
+        if(p.phase==='grow'){
+          p.r += (p.maxR - p.r)*0.08;
+          p.a = Math.min(1, p.a+0.03);
+          if(p.r > p.maxR-0.1) p.phase='hold';
+        }
+        pctx.beginPath();
+        pctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        pctx.fillStyle = `rgba(178,58,82,${0.75*p.a})`;
+        pctx.shadowColor = 'rgba(178,58,82,0.6)';
+        pctx.shadowBlur = 8;
+        pctx.fill();
+        pctx.shadowBlur = 0;
+        return true;
+      } else {
+        p.x += p.vx; p.y += p.vy;
+        p.a -= 0.006;
+        const color = p.type==='berry-release' ? '178,58,82' : '245,241,230';
+        pctx.beginPath();
+        pctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        pctx.fillStyle = `rgba(${color},${Math.max(0,p.a)})`;
+        pctx.shadowColor = `rgba(${color},0.7)`;
+        pctx.shadowBlur = 6;
+        pctx.fill();
+        pctx.shadowBlur = 0;
+        return p.a > 0 && p.y > -20;
+      }
+    });
+  }
+
+  let t0 = 0;
+  function loop(t){
+    t0 = t/1000;
+    drawStars(t0);
+    updateParticles();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // ---------- シーン制御 ----------
+  const lineMain = document.getElementById('line-main');
+  const lineMicro = document.getElementById('line-micro');
+  const choiceRow = document.getElementById('choice-row');
+  const inputRow = document.getElementById('input-row');
+  const wordInput = document.getElementById('word-input');
+  const submitWord = document.getElementById('submit-word');
+  const tapHint = document.getElementById('tap-hint');
+  const moonEl = document.getElementById('moon');
+  const floatingWord = document.getElementById('floating-word');
+  const stage = document.getElementById('stage');
+
+  let scene = 'intro';
+  let userWord = '';
+  const moonRect = ()=>document.getElementById('moon-wrap').getBoundingClientRect();
+
+  function setLine(text, micro){
+    lineMain.classList.remove('show');
+    lineMicro.classList.remove('show');
+    setTimeout(()=>{
+      lineMain.textContent = text || '';
+      lineMicro.textContent = micro || '';
+      requestAnimationFrame(()=>{
+        lineMain.classList.add('show');
+        if(micro) lineMicro.classList.add('show');
+      });
+    }, text ? 300 : 0);
+  }
+
+  function hideChoices(){
+    choiceRow.classList.remove('show');
+    inputRow.classList.remove('show');
+  }
+
+  function goIntro(){
+    scene='intro';
+    hideChoices();
+    tapHint.classList.remove('show');
+    hiddenScene.classList.remove('show');
+    if(audioPlaying){ furusatoAudio.pause(); furusatoAudio.currentTime=0; audioPlaying=false; soundToggle.textContent='Listen, softly'; }
+    setLine('', '');
+    setTimeout(()=>{
+      setLine('Buck Moon.', '');
+      setTimeout(()=> tapHint.classList.add('show'), 2600);
+    }, 600);
+  }
+
+  function goPrompt(){
+    scene='prompt';
+    tapHint.classList.remove('show');
+    setLine('Is there something you\u2019d like to let go of?', '');
+    setTimeout(()=>{
+      choiceRow.classList.add('show');
+    }, 1800);
+  }
+
+  function goWriting(){
+    scene='writing';
+    hideChoices();
+    setLine('Would you like to put it into words?', 'Just one word is enough');
+    setTimeout(()=>{
+      inputRow.classList.add('show');
+      wordInput.focus();
+    }, 1200);
+  }
+
+  function finishWithWord(word){
+    userWord = word.trim();
+    hideChoices();
+    if(userWord){
+      setLine('', '');
+      // 浮かぶ文字 → 月へ吸い込まれる
+      floatingWord.textContent = userWord;
+      floatingWord.style.transition = 'none';
+      floatingWord.style.opacity = '0';
+      floatingWord.style.transform = 'translate(-50%,-50%) scale(1)';
+      requestAnimationFrame(()=>{
+        floatingWord.style.transition = 'opacity 1.2s ease';
+        floatingWord.style.opacity = '0.9';
+      });
+      setTimeout(()=>{
+        const mr = moonRect();
+        floatingWord.style.transition = 'all 2.4s cubic-bezier(0.4,0,0.2,1)';
+        floatingWord.style.transform = 'translate(-50%,-50%) scale(0.3)';
+        floatingWord.style.opacity = '0';
+        floatingWord.style.top = '50%';
+        floatingWord.style.left = '50%';
+        moonEl.classList.add('lit');
+      }, 1400);
+      setTimeout(()=>{ moonEl.classList.remove('lit'); goBerries(); }, 4200);
+    } else {
+      setLine('Even words unspoken,', 'are enough as they are');
+      setTimeout(()=> goBerries(), 3400);
+    }
+  }
+
+  function goBerries(){
+    scene='berries';
+    hideChoices();
+    setLine('Summer\u2019s fruit glows around the moon.', '');
+    const mr = moonRect();
+    const cx = mr.left + mr.width/2;
+    const cy = mr.top + mr.height/2;
+    const radius = mr.width*0.85;
+    let count = 0;
+    const totalBerries = 7;
+    const interval = setInterval(()=>{
+      const angle = Math.random()*Math.PI*2;
+      const dist = radius + Math.random()*40;
+      spawnBerry(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist*0.6);
+      count++;
+      if(count >= totalBerries){
+        clearInterval(interval);
+        setTimeout(()=>{
+          tapHint.classList.add('show');
+          scene='berries-wait';
+        }, 1500);
+      }
+    }, 550);
+  }
+
+  function goRelease(){
+    scene='release';
+    tapHint.classList.remove('show');
+    moonEl.classList.add('lit');
+    setLine('Letting it all go, gently.', 'A release of love');
+    const mr = moonRect();
+    const cx = mr.left + mr.width/2;
+    const cy = mr.top + mr.height/2;
+
+    // 既存のベリーを解放パーティクルへ変換
+    const berryPositions = particles.filter(p=>p.type==='berry').map(p=>({x:p.x,y:p.y}));
+    particles = particles.filter(p=>p.type!=='berry');
+    berryPositions.forEach(p=> spawnRelease(p.x, p.y, true));
+
+    let bursts = 0;
+    const burstInterval = setInterval(()=>{
+      for(let i=0;i<3;i++){
+        spawnRelease(
+          cx + (Math.random()-0.5)*mr.width*0.6,
+          cy + (Math.random()-0.5)*mr.height*0.6,
+          false
+        );
+      }
+      bursts++;
+      if(bursts>18) clearInterval(burstInterval);
+    }, 160);
+
+    setTimeout(()=>{
+      moonEl.classList.remove('lit');
+      goClosing();
+    }, 5200);
+  }
+
+  function goClosing(){
+    scene='closing';
+    setLine('The moon remains, just as it is.', '');
+    setTimeout(()=>{
+      if(isFullMoonNight()){
+        offerHiddenScene();
+      } else {
+        tapHint.classList.add('show');
+        scene='end';
+      }
+    }, 3200);
+  }
+
+  // ---------- 満月判定（既知の新月を基準に朔望月で計算）----------
+  function isFullMoonNight(date){
+    date = date || new Date();
+    const synodicMonth = 29.530588853;
+    const knownNewMoon = Date.UTC(2000,0,6,18,14,0); // 2000-01-06 18:14 UTC
+    const diffDays = (date.getTime() - knownNewMoon) / 86400000;
+    const phase = ((diffDays % synodicMonth) + synodicMonth) % synodicMonth; // 0=新月, 半分=満月
+    const distFromFull = Math.abs(phase - synodicMonth/2);
+    return distFromFull < 1.0; // 満月の前後1日以内
+  }
+
+  const hiddenScene = document.getElementById('hidden-scene');
+  const soundToggle = document.getElementById('sound-toggle');
+  const furusatoAudio = document.getElementById('furusato-audio');
+  let audioPlaying = false;
+
+  function offerHiddenScene(){
+    scene='hidden-offer';
+    setLine('A somewhat special night.', 'Would you like to gently touch it?');
+    tapHint.classList.add('show');
+  }
+
+  function revealHiddenScene(){
+    scene='hidden';
+    tapHint.classList.remove('show');
+    setLine('', '');
+    hiddenScene.classList.add('show');
+  }
+
+  soundToggle.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if(!audioPlaying){
+      furusatoAudio.play().then(()=>{
+        audioPlaying = true;
+        soundToggle.textContent = 'Stop, softly';
+      }).catch(()=>{
+        // if public/audio/furusato-no-sora.mp3 doesn't exist yet, fail silently
+        soundToggle.textContent = '(there is no sound yet)';
+      });
+    } else {
+      furusatoAudio.pause();
+      furusatoAudio.currentTime = 0;
+      audioPlaying = false;
+      soundToggle.textContent = 'Listen, softly';
+    }
+  });
+
+  // ---------- 入力イベント ----------
+  document.getElementById('btn-write').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    goWriting();
+  });
+  document.getElementById('btn-close').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    finishWithWord('');
+  });
+  submitWord.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    finishWithWord(wordInput.value);
+  });
+  wordInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ finishWithWord(wordInput.value); }
+  });
+  wordInput.addEventListener('click', (e)=> e.stopPropagation());
+
+  stage.addEventListener('click', (e)=>{
+    if(e.target.closest('#choice-row') || e.target.closest('#input-row') || e.target.closest('#hidden-scene')) return;
+    if(scene==='intro') goPrompt();
+    else if(scene==='berries-wait') goRelease();
+    else if(scene==='hidden-offer') revealHiddenScene();
+    else if(scene==='hidden' || scene==='end') goIntro();
+  });
+
+  // 起動
+  setTimeout(goIntro, 400);
+})();
+</script>
+</body>
+</html>
