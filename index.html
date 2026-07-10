@@ -253,8 +253,8 @@
       <button class="choice-btn" id="btn-close">Gently close</button>
     </div>
     <div id="input-row">
-      <input type="text" id="word-input" placeholder="just a word" maxlength="40">
-      <button id="submit-word">Send it to the moon</button>
+      <input type="text" id="word-input" placeholder="" maxlength="40">
+      <button id="submit-word"></button>
     </div>
   </div>
   <div id="tap-hint">Touch the screen to continue</div>
@@ -408,8 +408,8 @@
     lineMain.classList.remove('show');
     lineMicro.classList.remove('show');
     setTimeout(()=>{
-      lineMain.textContent = text || '';
-      lineMicro.textContent = micro || '';
+      lineMain.innerHTML = text || '';
+      lineMicro.innerHTML = micro || '';
       requestAnimationFrame(()=>{
         lineMain.classList.add('show');
         if(micro) lineMicro.classList.add('show');
@@ -447,7 +447,7 @@
   function goWriting(){
     scene='writing';
     hideChoices();
-    setLine('Would you like to put it into words?', 'Just one word is enough');
+    setLine('<span style="color:#6aa3d5;">Would you like to put it into words?</span>', '');
     setTimeout(()=>{
       inputRow.classList.add('show');
       wordInput.focus();
