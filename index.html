@@ -233,6 +233,12 @@
     cursor:pointer;
   }
   #sound-toggle:hover{ border-color: rgba(217,220,232,0.7); }
+
+  /* ---------- 月→クローバー変化オーバーレイ ---------- */
+  #clover-canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    pointer-events:none; z-index:3;
+  }
 </style>
 </head>
 <body>
@@ -243,6 +249,7 @@
     <div id="moon"></div>
   </div>
   <canvas id="particles"></canvas>
+  <canvas id="clover-canvas"></canvas>
   <div id="floating-word"></div>
 
   <div id="privacy">This stays only within you. Nothing you write is ever sent or saved.</div>
@@ -283,17 +290,20 @@
   const sctx = starsCanvas.getContext('2d');
   const particlesCanvas = document.getElementById('particles');
   const pctx = particlesCanvas.getContext('2d');
+  const cloverCanvas = document.getElementById('clover-canvas');
+  const cctx = cloverCanvas.getContext('2d');
   let W, H, DPR;
 
   function resize(){
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth; H = window.innerHeight;
-    [starsCanvas, particlesCanvas].forEach(c=>{
+    [starsCanvas, particlesCanvas, cloverCanvas].forEach(c=>{
       c.width = W*DPR; c.height = H*DPR;
       c.style.width = W+"px"; c.style.height = H+"px";
     });
     sctx.setTransform(DPR,0,0,DPR,0,0);
     pctx.setTransform(DPR,0,0,DPR,0,0);
+    cctx.setTransform(DPR,0,0,DPR,0,0);
   }
   window.addEventListener('resize', resize);
   resize();
@@ -504,11 +514,283 @@
       if(count >= totalBerries){
         clearInterval(interval);
         setTimeout(()=>{
-          tapHint.classList.add('show');
-          scene='berries-wait';
-        }, 1500);
+          moonToClover();
+        }, 1800);
       }
     }, 550);
+  }
+
+  // ---------- 月 → レッドクローバー変化 ----------
+  // レッドクローバーの葉（楕円＋白いV字模様）
+  function drawTrifoliate(ctx, bx, by, leafR, angle, alpha){
+    const leafAngles = [-Math.PI/6, Math.PI/2, Math.PI + Math.PI/6];
+    leafAngles.forEach(la => {
+      const lx = bx + Math.cos(angle + la) * leafR * 0.9;
+      const ly = by + Math.sin(angle + la) * leafR * 0.9;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(angle + la + Math.PI/2);
+
+      // 葉身（楕円）
+      const lGrad = ctx.createRadialGradient(0, -leafR*0.15, 0, 0, 0, leafR*0.9);
+      lGrad.addColorStop(0,   `rgba(80,145,65,${alpha*0.95})`);
+      lGrad.addColorStop(0.5, `rgba(55,115,45,${alpha*0.9})`);
+      lGrad.addColorStop(1,   `rgba(38, 85,32,${alpha*0.7})`);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, leafR*0.58, leafR*0.88, 0, 0, Math.PI*2);
+      ctx.fillStyle = lGrad;
+      ctx.fill();
+
+      // 中央脈
+      ctx.strokeStyle = `rgba(100,175,80,${alpha*0.5})`;
+      ctx.lineWidth = leafR * 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, leafR*0.8);
+      ctx.lineTo(0, -leafR*0.8);
+      ctx.stroke();
+
+      // 白いV字（特徴的な模様）
+      ctx.strokeStyle = `rgba(210,225,200,${alpha*0.55})`;
+      ctx.lineWidth = leafR * 0.09;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-leafR*0.3, 0);
+      ctx.lineTo(0, -leafR*0.18);
+      ctx.lineTo(leafR*0.3, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    });
+
+    // 葉柄（中心から分岐する細い茎）
+    ctx.save();
+    ctx.strokeStyle = `rgba(65,110,50,${alpha*0.6})`;
+    ctx.lineWidth = leafR * 0.09;
+    ctx.lineCap = 'round';
+    leafAngles.forEach(la => {
+      const lx = bx + Math.cos(angle + la) * leafR * 0.9;
+      const ly = by + Math.sin(angle + la) * leafR * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(lx, ly);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // 球状花頭（密集した細長い花びら）
+  function drawFlowerHead(ctx, fx, fy, fr, alpha){
+    // 外側グロー
+    const glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr * 1.5);
+    glow.addColorStop(0,   `rgba(200,100,140,${alpha*0.35})`);
+    glow.addColorStop(0.6, `rgba(180, 70,120,${alpha*0.12})`);
+    glow.addColorStop(1,   `rgba(160, 50,100,0)`);
+    ctx.beginPath();
+    ctx.arc(fx, fy, fr * 1.5, 0, Math.PI*2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // 花托（ドーム底部・緑がかった茶）
+    const receptacleGrad = ctx.createRadialGradient(fx, fy+fr*0.3, 0, fx, fy, fr*0.55);
+    receptacleGrad.addColorStop(0, `rgba(90,120,55,${alpha*0.9})`);
+    receptacleGrad.addColorStop(1, `rgba(60, 90,40,${alpha*0.6})`);
+    ctx.beginPath();
+    ctx.ellipse(fx, fy + fr*0.28, fr*0.52, fr*0.32, 0, 0, Math.PI*2);
+    ctx.fillStyle = receptacleGrad;
+    ctx.fill();
+
+    // 花びら群（細長い管状花を密に並べる）
+    const PETAL_COUNT = 48;
+    for(let i = 0; i < PETAL_COUNT; i++){
+      const ratio = i / PETAL_COUNT;
+      const baseAngle = ratio * Math.PI * 2;
+      // 半球状に配置：外周から中心まで層を分ける
+      const layer = Math.floor(i / 16);
+      const layerR  = fr * (0.85 - layer * 0.28);
+      const px = fx + Math.cos(baseAngle) * layerR * (layer === 0 ? 1 : 0.55);
+      const py = fy + Math.sin(baseAngle) * layerR * 0.5 * (layer === 0 ? 1 : 0.6) - fr * layer * 0.12;
+
+      // 花びらの長さ・太さ
+      const pLen = fr * (0.62 - layer * 0.1);
+      const pWid = fr * 0.095;
+
+      // 色（外側が濃い赤紫、内側が明るいピンク）
+      const rr = 175 + layer * 20;
+      const gg = 55  + layer * 15;
+      const bb = 105 + layer * 10;
+
+      ctx.save();
+      ctx.translate(px, py);
+      // 花びらを中心から外へ向ける角度
+      const tiltAngle = Math.atan2(py - fy, px - fx) - Math.PI/2;
+      ctx.rotate(tiltAngle);
+
+      const pGrad = ctx.createLinearGradient(0, 0, 0, -pLen);
+      pGrad.addColorStop(0,   `rgba(${rr-20},${gg-10},${bb-20},${alpha*0.85})`);
+      pGrad.addColorStop(0.5, `rgba(${rr},${gg},${bb},${alpha*0.95})`);
+      pGrad.addColorStop(1,   `rgba(${rr+40},${gg+30},${bb+30},${alpha*0.8})`);
+
+      ctx.beginPath();
+      ctx.ellipse(0, -pLen/2, pWid/2, pLen/2, 0, 0, Math.PI*2);
+      ctx.fillStyle = pGrad;
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // 頂部の明るいハイライト
+    const topGlow = ctx.createRadialGradient(fx, fy - fr*0.3, 0, fx, fy, fr*0.7);
+    topGlow.addColorStop(0,   `rgba(240,160,190,${alpha*0.45})`);
+    topGlow.addColorStop(0.5, `rgba(210,110,155,${alpha*0.15})`);
+    topGlow.addColorStop(1,   `rgba(180, 70,120,0)`);
+    ctx.beginPath();
+    ctx.ellipse(fx, fy - fr*0.1, fr*0.55, fr*0.65, 0, 0, Math.PI*2);
+    ctx.fillStyle = topGlow;
+    ctx.fill();
+  }
+
+  function drawCloverShape(ctx, cx, cy, r, alpha){
+    ctx.save();
+
+    // --- 茎（太め、やや湾曲）---
+    const stemBot = { x: cx + r*0.05, y: cy + r*1.35 };
+    const stemTop = { x: cx,          y: cy + r*0.3  };
+    ctx.strokeStyle = `rgba(70,118,52,${alpha*0.88})`;
+    ctx.lineWidth   = r * 0.11;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(stemBot.x, stemBot.y);
+    ctx.bezierCurveTo(
+      stemBot.x + r*0.1, stemBot.y - r*0.5,
+      stemTop.x - r*0.05, stemTop.y + r*0.4,
+      stemTop.x, stemTop.y
+    );
+    ctx.stroke();
+
+    // 茎の産毛（細い短線を散らす）
+    ctx.strokeStyle = `rgba(100,150,70,${alpha*0.25})`;
+    ctx.lineWidth = r * 0.025;
+    for(let i = 0; i < 10; i++){
+      const tt = i / 10;
+      const hx = cx + (stemBot.x - cx) * (1 - tt);
+      const hy = cy + r*0.3 + (stemBot.y - cy - r*0.3) * (1 - tt);
+      const side = (i % 2 === 0 ? 1 : -1);
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + side * r*0.08, hy - r*0.04);
+      ctx.stroke();
+    }
+
+    // --- 下部の三つ葉（茎中段） ---
+    drawTrifoliate(ctx, cx - r*0.04, cy + r*0.78, r*0.38, -Math.PI/10, alpha);
+
+    // --- 上部の三つ葉（花の直下） ---
+    drawTrifoliate(ctx, cx, cy + r*0.32, r*0.32, Math.PI/12, alpha);
+
+    // --- 花頭（球状・上部中央） ---
+    drawFlowerHead(ctx, cx, cy - r*0.22, r*0.55, alpha);
+
+    ctx.restore();
+  }
+
+  function moonToClover(){
+    scene = 'moon-transform';
+    tapHint.classList.remove('show');
+
+    const mr = moonRect();
+    const cx = mr.left + mr.width / 2;
+    const cy = mr.top  + mr.height / 2;
+    const moonR = mr.width / 2;
+
+    const DURATION = 4200; // ms
+    const startTime = performance.now();
+
+    // ベリーパーティクルを消す
+    particles = particles.filter(p => p.type !== 'berry');
+
+    function animFrame(now){
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / DURATION, 1); // 0→1
+      const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out
+
+      cctx.clearRect(0, 0, W, H);
+
+      // 月をフェードアウト（CSSではなくcanvasで重ねて消す）
+      if(t < 0.85){
+        const moonFade = 1 - Math.min(t / 0.7, 1);
+        cctx.save();
+        cctx.globalAlpha = (1 - moonFade);
+        // 月の上にベールをかける（背景色で塗りつぶし）
+        const veilGrad = cctx.createRadialGradient(cx, cy, 0, cx, cy, moonR * 1.6);
+        veilGrad.addColorStop(0,   `rgba(15,20,40,${(1-moonFade)*0.92})`);
+        veilGrad.addColorStop(0.7, `rgba(15,20,40,${(1-moonFade)*0.6})`);
+        veilGrad.addColorStop(1,   `rgba(15,20,40,0)`);
+        cctx.beginPath();
+        cctx.arc(cx, cy, moonR * 1.6, 0, Math.PI * 2);
+        cctx.fillStyle = veilGrad;
+        cctx.fill();
+        cctx.restore();
+      } else {
+        // 月を完全に覆う
+        cctx.save();
+        const veilGrad = cctx.createRadialGradient(cx, cy, 0, cx, cy, moonR * 1.6);
+        veilGrad.addColorStop(0,   `rgba(15,20,40,0.92)`);
+        veilGrad.addColorStop(0.7, `rgba(15,20,40,0.6)`);
+        veilGrad.addColorStop(1,   `rgba(15,20,40,0)`);
+        cctx.beginPath();
+        cctx.arc(cx, cy, moonR * 1.6, 0, Math.PI * 2);
+        cctx.fillStyle = veilGrad;
+        cctx.fill();
+        cctx.restore();
+      }
+
+      // クローバーをフェードイン（t > 0.3 から）
+      if(t > 0.28){
+        const cloverAlpha = Math.min((t - 0.28) / 0.55, 1);
+        const cloverR = moonR * 0.62 * (0.35 + 0.65 * Math.min((t-0.28)/0.4, 1));
+        // cy + moonR*0.3 → 花頭が月の中心付近、茎が下方へ伸びる配置
+        drawCloverShape(cctx, cx, cy + moonR * 0.3, cloverR, cloverAlpha);
+      }
+
+      if(t < 1){
+        requestAnimationFrame(animFrame);
+      } else {
+        // 変化完了 → しばらく表示してからタップ待ちへ
+        setLine('Something gentle, blooming here.', '');
+        setTimeout(()=>{
+          // クローバーをゆっくりフェードアウト
+          let fadeT = 0;
+          function fadeOut(){
+            fadeT += 0.012;
+            cctx.clearRect(0, 0, W, H);
+            if(fadeT < 1){
+              const a = 1 - fadeT;
+              // ベール維持
+              const veilGrad = cctx.createRadialGradient(cx, cy, 0, cx, cy, moonR * 1.6);
+              veilGrad.addColorStop(0,   `rgba(15,20,40,${0.92 * a})`);
+              veilGrad.addColorStop(0.7, `rgba(15,20,40,${0.6 * a})`);
+              veilGrad.addColorStop(1,   `rgba(15,20,40,0)`);
+              cctx.save();
+              cctx.beginPath();
+              cctx.arc(cx, cy, moonR * 1.6, 0, Math.PI * 2);
+              cctx.fillStyle = veilGrad;
+              cctx.fill();
+              cctx.restore();
+              drawCloverShape(cctx, cx, cy + moonR*0.3, moonR*0.62, a);
+              requestAnimationFrame(fadeOut);
+            } else {
+              cctx.clearRect(0, 0, W, H);
+              tapHint.classList.add('show');
+              scene = 'berries-wait';
+            }
+          }
+          requestAnimationFrame(fadeOut);
+        }, 2800);
+      }
+    }
+    requestAnimationFrame(animFrame);
   }
 
   function goRelease(){
