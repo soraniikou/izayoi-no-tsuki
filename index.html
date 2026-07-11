@@ -746,14 +746,14 @@
       ctx.stroke();
     }
 
-    // --- 下部の三つ葉（茎中段） ---
-    drawTrifoliate(ctx, cx - r*0.04, cy + r*0.78, r*0.38, -Math.PI/10, alpha);
+    // --- 下部の三つ葉（茎中段・0.6倍） ---
+    drawTrifoliate(ctx, cx - r*0.04, cy + r*0.78, r*0.38*0.6, -Math.PI/10, alpha);
 
-    // --- 上部の三つ葉（花の直下） ---
-    drawTrifoliate(ctx, cx, cy + r*0.32, r*0.32, Math.PI/12, alpha);
+    // --- 上部の三つ葉（花の直下・0.6倍） ---
+    drawTrifoliate(ctx, cx, cy + r*0.32, r*0.32*0.6, Math.PI/12, alpha);
 
-    // --- 花頭（球状・上部中央） ---
-    drawFlowerHead(ctx, cx, cy - r*0.22, r*0.55, alpha);
+    // --- 花頭（1.5倍） ---
+    drawFlowerHead(ctx, cx, cy - r*0.22, r*0.55*1.5, alpha);
 
     ctx.restore();
   }
@@ -826,7 +826,7 @@
           // クローバーをゆっくりフェードアウト
           let fadeT = 0;
           function fadeOut(){
-            fadeT += 0.012;
+            fadeT += 0.006;
             cctx.clearRect(0, 0, W, H);
             if(fadeT < 1){
               const a = 1 - fadeT;
@@ -850,7 +850,7 @@
             }
           }
           requestAnimationFrame(fadeOut);
-        }, 2800);
+        }, 12000);
       }
     }
     requestAnimationFrame(animFrame);
