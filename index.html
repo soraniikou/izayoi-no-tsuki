@@ -590,80 +590,127 @@
     ctx.restore();
   }
 
-  // 丸みのあるポンポン型花頭
+  // 個々の小花を描く（花びらが外向きに開く）
+  function drawFloret(ctx, px, py, size, outAngle, alpha){
+    const PETAL = 5;
+    for(let p = 0; p < PETAL; p++){
+      const pa = outAngle + (p / PETAL) * Math.PI * 2;
+      const tipX = px + Math.cos(pa) * size * 1.0;
+      const tipY = py + Math.sin(pa) * size * 0.92;
+      const midX = px + Math.cos(pa) * size * 0.48;
+      const midY = py + Math.sin(pa) * size * 0.44;
+      const lx   = px + Math.cos(pa - 0.55) * size * 0.42;
+      const ly   = py + Math.sin(pa - 0.55) * size * 0.38;
+      const rx   = px + Math.cos(pa + 0.55) * size * 0.42;
+      const ry   = py + Math.sin(pa + 0.55) * size * 0.38;
+
+      // 花びらグラデーション（根元が白っぽく、先端が濃い赤紫）
+      const pGrad = ctx.createLinearGradient(px, py, tipX, tipY);
+      pGrad.addColorStop(0,    `rgba(245,195,215,${alpha*0.9})`);
+      pGrad.addColorStop(0.35, `rgba(205,100,148,${alpha*0.95})`);
+      pGrad.addColorStop(0.75, `rgba(168, 52,110,${alpha*0.95})`);
+      pGrad.addColorStop(1,    `rgba(140, 35, 88,${alpha*0.85})`);
+
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.quadraticCurveTo(lx, ly, tipX, tipY);
+      ctx.quadraticCurveTo(rx, ry, px, py);
+      ctx.fillStyle = pGrad;
+      ctx.fill();
+
+      // 花びら中央の細い筋
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.strokeStyle = `rgba(220,140,175,1)`;
+      ctx.lineWidth = size * 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(tipX, tipY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 小花の中心（白→薄黄）
+    const cGrad = ctx.createRadialGradient(px, py, 0, px, py, size*0.28);
+    cGrad.addColorStop(0,   `rgba(255,252,235,${alpha*0.98})`);
+    cGrad.addColorStop(0.6, `rgba(235,215,170,${alpha*0.85})`);
+    cGrad.addColorStop(1,   `rgba(200,170,110,${alpha*0.5})`);
+    ctx.beginPath();
+    ctx.arc(px, py, size * 0.28, 0, Math.PI*2);
+    ctx.fillStyle = cGrad;
+    ctx.fill();
+  }
+
+  // 画像に近いレッドクローバー花頭
   function drawFlowerHead(ctx, fx, fy, fr, alpha){
     // 外側グロー
-    const glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr * 1.55);
-    glow.addColorStop(0,   `rgba(210,110,150,${alpha*0.38})`);
-    glow.addColorStop(0.55,`rgba(190, 80,130,${alpha*0.14})`);
-    glow.addColorStop(1,   `rgba(160, 50,105,0)`);
+    const glow = ctx.createRadialGradient(fx, fy - fr*0.1, 0, fx, fy, fr * 1.6);
+    glow.addColorStop(0,   `rgba(210,100,145,${alpha*0.32})`);
+    glow.addColorStop(0.6, `rgba(180, 60,115,${alpha*0.1})`);
+    glow.addColorStop(1,   `rgba(150, 40, 95,0)`);
     ctx.beginPath();
-    ctx.arc(fx, fy, fr * 1.55, 0, Math.PI*2);
+    ctx.arc(fx, fy, fr * 1.6, 0, Math.PI*2);
     ctx.fillStyle = glow;
     ctx.fill();
 
-    // 花托（底部・緑）
-    const receptacleGrad = ctx.createRadialGradient(fx, fy + fr*0.25, 0, fx, fy, fr*0.52);
-    receptacleGrad.addColorStop(0, `rgba(100,140,65,${alpha*0.88})`);
-    receptacleGrad.addColorStop(1, `rgba( 70,105,45,${alpha*0.55})`);
-    ctx.beginPath();
-    ctx.ellipse(fx, fy + fr*0.26, fr*0.5, fr*0.3, 0, 0, Math.PI*2);
-    ctx.fillStyle = receptacleGrad;
-    ctx.fill();
-
-    // ポンポン状の丸い小花（球面に並べる）
-    const FLORET_COUNT = 52;
-    for(let i = 0; i < FLORET_COUNT; i++){
-      const ratio = i / FLORET_COUNT;
-      const azimuth = ratio * Math.PI * 2 + (Math.floor(i/13) * 0.35);
-      // 仰角：0=赤道、大きいほど頂点に近い
-      const elev = (Math.floor(i / 13) / 3) * (Math.PI * 0.48);
-      // 球面座標→2D投影（y軸を上に半球）
-      const projR = fr * 0.82 * Math.cos(elev);
-      const px = fx + Math.cos(azimuth) * projR;
-      const py = fy + Math.sin(azimuth) * projR * 0.52 - fr * Math.sin(elev) * 0.88;
-
-      // 小花のサイズ（頂部ほど小さく）
-      const floretR = fr * (0.18 - Math.floor(i/13) * 0.025);
-
-      // 色：外側は濃い赤紫、頂部ほど明るいピンク
-      const layer = Math.floor(i / 13);
-      const rr = 168 + layer * 22;
-      const gg =  52 + layer * 18;
-      const bb = 108 + layer * 14;
-
-      // 小花本体（丸い）
-      const fGrad = ctx.createRadialGradient(
-        px - floretR*0.3, py - floretR*0.3, 0,
-        px, py, floretR
-      );
-      fGrad.addColorStop(0,   `rgba(${rr+45},${gg+35},${bb+30},${alpha*0.95})`);
-      fGrad.addColorStop(0.6, `rgba(${rr},${gg},${bb},${alpha*0.92})`);
-      fGrad.addColorStop(1,   `rgba(${rr-25},${gg-18},${bb-15},${alpha*0.55})`);
+    // がく（sepal）：尖った緑の三角形を花底に並べる
+    const SEPAL = 10;
+    for(let s = 0; s < SEPAL; s++){
+      const sa = (s / SEPAL) * Math.PI * 2 + 0.15;
+      const sx = fx + Math.cos(sa) * fr * 0.5;
+      const sy = fy + fr * 0.36 + Math.sin(sa) * fr * 0.22;
+      const tipSx = fx + Math.cos(sa) * fr * 0.85;
+      const tipSy = sy + fr * 0.38;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.88;
+      ctx.fillStyle = `rgba(85,138,58,1)`;
       ctx.beginPath();
-      ctx.arc(px, py, floretR, 0, Math.PI*2);
-      ctx.fillStyle = fGrad;
+      ctx.moveTo(sx - fr*0.06, sy);
+      ctx.lineTo(tipSx, tipSy);
+      ctx.lineTo(sx + fr*0.06, sy);
+      ctx.closePath();
       ctx.fill();
+      ctx.restore();
     }
 
-    // 全体をまとめる球形ベース（半透明）
-    const ballGrad = ctx.createRadialGradient(fx - fr*0.22, fy - fr*0.25, 0, fx, fy, fr*0.9);
-    ballGrad.addColorStop(0,   `rgba(235,145,175,${alpha*0.22})`);
-    ballGrad.addColorStop(0.6, `rgba(185, 75,125,${alpha*0.18})`);
-    ballGrad.addColorStop(1,   `rgba(145, 45, 95,${alpha*0.06})`);
+    // 花托（緑のドーム底部）
+    const recGrad = ctx.createRadialGradient(fx, fy + fr*0.22, 0, fx, fy + fr*0.1, fr*0.58);
+    recGrad.addColorStop(0, `rgba(110,158,72,${alpha*0.92})`);
+    recGrad.addColorStop(1, `rgba( 72,112,46,${alpha*0.6})`);
     ctx.beginPath();
-    ctx.arc(fx, fy, fr * 0.9, 0, Math.PI*2);
-    ctx.fillStyle = ballGrad;
+    ctx.ellipse(fx, fy + fr*0.28, fr*0.52, fr*0.28, 0, 0, Math.PI*2);
+    ctx.fillStyle = recGrad;
     ctx.fill();
 
-    // 頂部ハイライト
-    const topGlow = ctx.createRadialGradient(fx, fy - fr*0.35, 0, fx, fy - fr*0.1, fr*0.62);
-    topGlow.addColorStop(0,   `rgba(250,175,205,${alpha*0.5})`);
-    topGlow.addColorStop(0.55,`rgba(215,120,160,${alpha*0.18})`);
-    topGlow.addColorStop(1,   `rgba(185, 75,125,0)`);
+    // 小花を球面に配置（外周4層）
+    const layers = [
+      { count: 12, elevFrac: 0.0, rScale: 0.82, yOff: 0.0,  sizeF: 0.21 }, // 外周
+      { count: 10, elevFrac: 0.3, rScale: 0.62, yOff: 0.28, sizeF: 0.195 },
+      { count:  8, elevFrac: 0.6, rScale: 0.38, yOff: 0.52, sizeF: 0.178 },
+      { count:  4, elevFrac: 1.0, rScale: 0.12, yOff: 0.75, sizeF: 0.16  }, // 頂部
+    ];
+
+    layers.forEach((layer, li) => {
+      for(let i = 0; i < layer.count; i++){
+        const az = (i / layer.count) * Math.PI * 2 + li * 0.38;
+        const px = fx + Math.cos(az) * fr * layer.rScale;
+        const py = fy - fr * layer.yOff + Math.sin(az) * fr * layer.rScale * 0.48;
+        const floretSize = fr * layer.sizeF;
+        // 外向き角度（球面の法線方向）
+        const outAngle = Math.atan2(py - (fy - fr*0.3), px - fx);
+        drawFloret(ctx, px, py, floretSize, outAngle, alpha);
+      }
+    });
+
+    // 全体球形にうっすら色をのせる
+    const overlay = ctx.createRadialGradient(fx - fr*0.18, fy - fr*0.28, 0, fx, fy, fr*0.92);
+    overlay.addColorStop(0,   `rgba(240,160,195,${alpha*0.18})`);
+    overlay.addColorStop(0.7, `rgba(175, 58,115,${alpha*0.1})`);
+    overlay.addColorStop(1,   `rgba(145, 40, 95,0)`);
     ctx.beginPath();
-    ctx.ellipse(fx, fy - fr*0.1, fr*0.52, fr*0.6, 0, 0, Math.PI*2);
-    ctx.fillStyle = topGlow;
+    ctx.arc(fx, fy, fr * 0.92, 0, Math.PI*2);
+    ctx.fillStyle = overlay;
     ctx.fill();
   }
 
