@@ -190,39 +190,24 @@
   #hidden-scene{
     position:absolute; inset:0; z-index:8;
     opacity:0; pointer-events:none;
-    transition: opacity 3s ease;
-    background: linear-gradient(180deg, rgba(10,14,28,0) 0%, rgba(10,14,28,0.55) 60%, rgba(10,14,28,0.85) 100%);
+    transition: opacity 4s ease;
   }
   #hidden-scene.show{ opacity:1; pointer-events:auto; }
 
-  #hills{
-    position:absolute; bottom:0; left:0; width:100%; height:28vh;
-    background: linear-gradient(180deg, rgba(70,80,110,0.0) 0%, rgba(45,54,82,0.55) 100%);
-    clip-path: path('M0,90 C 150,40 300,110 480,60 C 660,15 820,95 1000,50 C 1150,15 1300,70 1440,45 L1440,200 L0,200 Z');
-    opacity:0.85;
+  #highland-canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    pointer-events:none;
   }
-  #susuki{
-    position:absolute; bottom:0; left:0; width:100%; height:16vh;
-    background: linear-gradient(180deg, rgba(180,175,150,0.0) 0%, rgba(60,58,48,0.5) 100%);
-    clip-path: polygon(
-      0% 100%, 0% 60%, 3% 40%, 6% 65%, 9% 35%, 12% 62%, 16% 30%, 20% 60%,
-      24% 42%, 28% 65%, 33% 38%, 38% 62%, 44% 32%, 50% 60%, 56% 40%,
-      62% 63%, 68% 34%, 74% 60%, 80% 42%, 86% 65%, 92% 36%, 96% 60%, 100% 45%, 100% 100%
-    );
-    animation: sway 7s ease-in-out infinite;
-    transform-origin: bottom center;
-  }
-  @keyframes sway{
-    0%,100%{ transform: skewX(0deg); }
-    50%{ transform: skewX(0.6deg); }
-  }
+
   #hidden-text{
-    position:absolute; top:14%; left:50%; transform:translateX(-50%);
-    text-align:center; width:80%; max-width:520px;
+    position:absolute; top:10%; left:50%; transform:translateX(-50%);
+    text-align:center; width:82%; max-width:540px;
     font-family:'Shippori Mincho', serif;
-    font-size: clamp(14px, 2vmin, 17px);
-    line-height:2;
-    color: rgba(217,220,232,0.85);
+    font-size: clamp(13px, 1.9vmin, 16px);
+    line-height:2.1;
+    color: rgba(210,218,235,0.88);
+    text-shadow: 0 2px 16px rgba(5,10,25,0.95);
+    letter-spacing: 0.03em;
   }
   #sound-toggle{
     position:absolute; bottom:6vh; left:50%; transform:translateX(-50%);
@@ -230,7 +215,7 @@
     font-weight:300; font-size:12px; letter-spacing:0.08em;
     background:none; border:1px solid rgba(217,220,232,0.35);
     color:var(--ink); border-radius:999px; padding:9px 22px;
-    cursor:pointer;
+    cursor:pointer; z-index:2;
   }
   #sound-toggle:hover{ border-color: rgba(217,220,232,0.7); }
 
@@ -269,12 +254,12 @@
   <div id="tap-hint">Touch the screen to continue</div>
 
   <div id="hidden-scene">
-    <div id="hills"></div>
-    <div id="susuki"></div>
+    <canvas id="highland-canvas"></canvas>
     <div id="hidden-text">
-      Under the same full moon, on distant Highland hills,<br>
-      and in fields of pampas grass, people danced.<br>
-      They were looking up at the same moon.
+      Under the same full moon —<br>
+      on Highland hills where the heather sways,<br>
+      and in fields of pampas grass where the wind breathes —<br>
+      people danced. They were looking up at the same moon.
     </div>
     <button id="sound-toggle">Listen, softly</button>
   </div>
@@ -439,6 +424,7 @@
     hideChoices();
     tapHint.classList.remove('show');
     hiddenScene.classList.remove('show');
+    if(highlandRAF){ cancelAnimationFrame(highlandRAF); highlandRAF=null; hctx.clearRect(0,0,window.innerWidth,window.innerHeight); }
     if(audioPlaying){ furusatoAudio.pause(); furusatoAudio.currentTime=0; audioPlaying=false; soundToggle.textContent='Listen, softly'; }
     setLine('', '');
     setTimeout(()=>{
@@ -918,6 +904,292 @@
   const furusatoAudio = document.getElementById('furusato-audio');
   let audioPlaying = false;
 
+  // ---------- ハイランド情景 canvas ----------
+  const highlandCanvas = document.getElementById('highland-canvas');
+  const hctx = highlandCanvas.getContext('2d');
+  let highlandRAF = null;
+
+  function resizeHighland(){
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    highlandCanvas.width  = window.innerWidth  * dpr;
+    highlandCanvas.height = window.innerHeight * dpr;
+    highlandCanvas.style.width  = window.innerWidth  + 'px';
+    highlandCanvas.style.height = window.innerHeight + 'px';
+    hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeHighland);
+  resizeHighland();
+
+  function drawHighlandScene(t){
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    hctx.clearRect(0, 0, w, h);
+
+    // ── 夜空グラデーション（上：深い紺 / 下：紫がかった濃紺）──
+    const sky = hctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0,   'rgba(8,12,28,0.98)');
+    sky.addColorStop(0.45,'rgba(15,20,48,0.97)');
+    sky.addColorStop(0.72,'rgba(22,28,58,0.93)');
+    sky.addColorStop(1,   'rgba(10,14,30,0.97)');
+    hctx.fillStyle = sky;
+    hctx.fillRect(0, 0, w, h);
+
+    // ── 満月の光が地平線に落ちる moonbeam ──
+    const moonX = w * 0.5;
+    const moonY = h * 0.22;
+    const beam = hctx.createRadialGradient(moonX, moonY, 0, moonX, moonY + h*0.35, h*0.7);
+    beam.addColorStop(0,   'rgba(240,235,200,0.10)');
+    beam.addColorStop(0.4, 'rgba(200,210,230,0.05)');
+    beam.addColorStop(1,   'rgba(100,120,180,0)');
+    hctx.fillStyle = beam;
+    hctx.fillRect(0, 0, w, h);
+
+    // ── 霧（遠景：うっすらかかる白い靄）──
+    const fogY = h * 0.55;
+    const fog1 = hctx.createLinearGradient(0, fogY - h*0.08, 0, fogY + h*0.06);
+    fog1.addColorStop(0,   'rgba(195,205,225,0)');
+    fog1.addColorStop(0.4, 'rgba(195,205,225,0.13)');
+    fog1.addColorStop(1,   'rgba(195,205,225,0)');
+    hctx.fillStyle = fog1;
+    hctx.fillRect(0, fogY - h*0.08, w, h*0.14);
+
+    // ── ハイランドの丘々（3層・奥から手前）──
+    function drawHill(pts, color){
+      hctx.beginPath();
+      hctx.moveTo(0, h);
+      pts.forEach((p, i)=>{
+        if(i===0) hctx.lineTo(p[0]*w, p[1]*h);
+        else {
+          const prev = pts[i-1];
+          const cpx = (prev[0]*w + p[0]*w)/2;
+          hctx.bezierCurveTo(cpx, prev[1]*h, cpx, p[1]*h, p[0]*w, p[1]*h);
+        }
+      });
+      hctx.lineTo(w, h);
+      hctx.closePath();
+      hctx.fillStyle = color;
+      hctx.fill();
+    }
+
+    // 最遠景の丘（薄い青紫・ハイランドの山稜）
+    drawHill([
+      [0,0.62],[0.08,0.54],[0.18,0.48],[0.28,0.52],[0.38,0.45],
+      [0.50,0.50],[0.62,0.44],[0.74,0.49],[0.85,0.46],[1.0,0.55]
+    ], 'rgba(55,62,105,0.72)');
+
+    // 中景の丘（やや緑がかった濃紺）
+    drawHill([
+      [0,0.72],[0.06,0.66],[0.15,0.60],[0.26,0.65],[0.36,0.58],
+      [0.48,0.63],[0.60,0.57],[0.72,0.62],[0.84,0.58],[1.0,0.68]
+    ], 'rgba(38,48,78,0.85)');
+
+    // 前景の丘（最も暗い・緑みがかった黒）
+    drawHill([
+      [0,0.82],[0.05,0.77],[0.14,0.73],[0.25,0.76],[0.35,0.71],
+      [0.46,0.75],[0.58,0.70],[0.70,0.74],[0.82,0.71],[0.92,0.75],[1.0,0.80]
+    ], 'rgba(22,30,48,0.95)');
+
+    // ── ヒース（heather）：前景丘の上に小さな紫の点群 ──
+    const hillTopY = h * 0.70;
+    // 揺らぎ用 seed（毎フレーム固定でOK）
+    const heatherSeeds = [
+      [0.08,0.75],[0.14,0.72],[0.20,0.74],[0.28,0.71],[0.35,0.73],
+      [0.42,0.70],[0.50,0.72],[0.57,0.71],[0.64,0.73],[0.71,0.71],
+      [0.78,0.72],[0.85,0.73],[0.92,0.74],[0.04,0.78],[0.32,0.76],
+      [0.60,0.75],[0.88,0.77],[0.22,0.77],[0.48,0.76],[0.75,0.75]
+    ];
+    heatherSeeds.forEach((s, idx)=>{
+      const hx = s[0]*w;
+      const hy = s[1]*h + Math.sin(t*0.7 + idx)*1.2;
+      const swing = Math.sin(t*0.9 + idx*1.3) * 1.5;
+      // 茎
+      hctx.save();
+      hctx.strokeStyle = 'rgba(90,110,70,0.55)';
+      hctx.lineWidth = 1.2;
+      hctx.beginPath();
+      hctx.moveTo(hx, hy + 10);
+      hctx.lineTo(hx + swing, hy);
+      hctx.stroke();
+      // 花（小さい紫点）
+      const hGrad = hctx.createRadialGradient(hx+swing, hy-2, 0, hx+swing, hy-2, 5);
+      hGrad.addColorStop(0, 'rgba(195,140,205,0.88)');
+      hGrad.addColorStop(1, 'rgba(145, 85,175,0)');
+      hctx.fillStyle = hGrad;
+      hctx.beginPath();
+      hctx.arc(hx+swing, hy-2, 5, 0, Math.PI*2);
+      hctx.fill();
+      hctx.restore();
+    });
+
+    // ── ススキ（日本側・右寄りに群生）──
+    const susukiRoots = [];
+    for(let i=0;i<32;i++){
+      // 右寄りに密集、左に少し
+      const xRatio = i < 22 ? 0.55 + (i/22)*0.45 : (i-22)/10*0.3;
+      susukiRoots.push({ x: xRatio, baseY: 0.92 + Math.sin(i*2.3)*0.04 });
+    }
+    susukiRoots.forEach((s, idx)=>{
+      const sx = s.x * w;
+      const sy = s.baseY * h;
+      const stemH = h * (0.14 + Math.sin(idx*1.7)*0.04);
+      const sw = Math.sin(t * 0.6 + idx * 0.8) * (stemH * 0.06);
+      const sw2 = Math.sin(t * 0.55 + idx * 0.9 + 1) * (stemH * 0.04);
+
+      // 茎
+      hctx.save();
+      hctx.strokeStyle = `rgba(175,168,130,${0.5 + Math.sin(idx)*0.15})`;
+      hctx.lineWidth = 1.0;
+      hctx.lineCap = 'round';
+      hctx.beginPath();
+      hctx.moveTo(sx, sy);
+      hctx.bezierCurveTo(sx + sw*0.4, sy - stemH*0.5, sx + sw, sy - stemH*0.85, sx + sw + sw2, sy - stemH);
+      hctx.stroke();
+
+      // 穂（楕円でふっくら）
+      const tipX = sx + sw + sw2;
+      const tipY = sy - stemH;
+      const spGrad = hctx.createRadialGradient(tipX, tipY+4, 0, tipX, tipY, 9);
+      spGrad.addColorStop(0,   `rgba(225,218,185,${0.65 + Math.sin(idx)*0.1})`);
+      spGrad.addColorStop(0.5, `rgba(195,185,148,0.45)`);
+      spGrad.addColorStop(1,   'rgba(160,150,115,0)');
+      hctx.fillStyle = spGrad;
+      hctx.beginPath();
+      hctx.ellipse(tipX, tipY + 3, 4.5, 10, Math.sin(t*0.5+idx)*0.15, 0, Math.PI*2);
+      hctx.fill();
+      hctx.restore();
+    });
+
+    // ── 霧（手前・地面に漂う）──
+    const groundFogY = h * 0.78;
+    for(let fi=0;fi<3;fi++){
+      const fy2 = groundFogY + fi * h*0.055;
+      const fopac = [0.12, 0.09, 0.06][fi];
+      const ffog = hctx.createLinearGradient(0, fy2 - h*0.04, 0, fy2 + h*0.05);
+      ffog.addColorStop(0,   `rgba(185,195,220,0)`);
+      ffog.addColorStop(0.45,`rgba(185,195,220,${fopac + Math.sin(t*0.3+fi)*0.015})`);
+      ffog.addColorStop(1,   `rgba(185,195,220,0)`);
+      hctx.fillStyle = ffog;
+      hctx.fillRect(0, fy2 - h*0.04, w, h*0.09);
+    }
+
+    // ── 石積みの塀（ドライストーン・ウォール）──
+    const wallY = h * 0.84;
+    const wallH = h * 0.028;
+    hctx.save();
+    hctx.fillStyle = 'rgba(52,58,72,0.82)';
+    hctx.beginPath();
+    hctx.rect(0, wallY, w * 0.48, wallH);
+    hctx.fill();
+    // 石の目地（横線）
+    hctx.strokeStyle = 'rgba(30,36,52,0.6)';
+    hctx.lineWidth = 0.8;
+    for(let r=0;r<3;r++){
+      hctx.beginPath();
+      hctx.moveTo(0, wallY + r*(wallH/3));
+      hctx.lineTo(w*0.48, wallY + r*(wallH/3));
+      hctx.stroke();
+    }
+    // 縦目地（ランダム）
+    [0.06,0.13,0.19,0.26,0.31,0.38,0.44].forEach(xr=>{
+      const jy = wallY + (Math.floor(xr*100)%2)*(wallH/3);
+      hctx.beginPath();
+      hctx.moveTo(xr*w, jy);
+      hctx.lineTo(xr*w, jy + wallH/3);
+      hctx.stroke();
+    });
+    hctx.restore();
+
+    // ── 月明かりの水面反射（池）──
+    const pondX = w*0.3;
+    const pondY = h*0.87;
+    const refGrad = hctx.createRadialGradient(pondX, pondY, 0, pondX, pondY, w*0.08);
+    refGrad.addColorStop(0,   `rgba(220,228,200,${0.18 + Math.sin(t*1.2)*0.03})`);
+    refGrad.addColorStop(0.5, 'rgba(180,195,220,0.07)');
+    refGrad.addColorStop(1,   'rgba(140,165,200,0)');
+    hctx.save();
+    hctx.scale(1, 0.32);
+    hctx.fillStyle = refGrad;
+    hctx.beginPath();
+    hctx.ellipse(pondX, pondY/0.32, w*0.08, w*0.08, 0, 0, Math.PI*2);
+    hctx.fill();
+    hctx.restore();
+
+    // ── シルエット（踊る人影・左寄り2人）──
+    function drawFigure(fx2, fy2, scale, phase){
+      hctx.save();
+      hctx.translate(fx2, fy2);
+      hctx.scale(scale, scale);
+      const sway2 = Math.sin(t*1.4 + phase) * 4;
+      const armSwing = Math.sin(t*1.4 + phase) * 0.35;
+      hctx.fillStyle = 'rgba(15,18,32,0.88)';
+      hctx.strokeStyle = 'rgba(15,18,32,0.88)';
+      hctx.lineWidth = 2.8;
+      hctx.lineCap = 'round';
+      // 頭
+      hctx.beginPath();
+      hctx.arc(sway2*0.3, -48, 7, 0, Math.PI*2);
+      hctx.fill();
+      // 胴体
+      hctx.beginPath();
+      hctx.moveTo(sway2*0.3, -41);
+      hctx.lineTo(sway2*0.1, -18);
+      hctx.stroke();
+      // 左腕
+      hctx.beginPath();
+      hctx.moveTo(sway2*0.2, -36);
+      hctx.lineTo(sway2*0.2 - 14*Math.cos(armSwing), -36 + 14*Math.sin(armSwing) - 8);
+      hctx.stroke();
+      // 右腕（持ち上げ）
+      hctx.beginPath();
+      hctx.moveTo(sway2*0.2, -36);
+      hctx.lineTo(sway2*0.2 + 16*Math.cos(armSwing+0.5), -36 - 14*Math.sin(armSwing+0.5));
+      hctx.stroke();
+      // 脚
+      const legSwing = Math.sin(t*1.4 + phase) * 0.3;
+      hctx.beginPath();
+      hctx.moveTo(sway2*0.1, -18);
+      hctx.lineTo(sway2*0.1 - 8*Math.sin(legSwing), 0);
+      hctx.stroke();
+      hctx.beginPath();
+      hctx.moveTo(sway2*0.1, -18);
+      hctx.lineTo(sway2*0.1 + 10*Math.sin(legSwing+0.4), 0);
+      hctx.stroke();
+      hctx.restore();
+    }
+
+    drawFigure(w*0.15, h*0.83, h/700, 0);
+    drawFigure(w*0.20, h*0.83, h/700, Math.PI*0.7);
+
+    // ── 画面上部：夜空に浮かぶ雲の切れ間 ──
+    const cloudAlpha = 0.06 + Math.sin(t*0.18)*0.02;
+    for(let ci=0;ci<4;ci++){
+      const cx2 = w*(0.1 + ci*0.25 + Math.sin(t*0.05+ci)*0.03);
+      const cy2 = h*(0.12 + Math.sin(ci*1.3)*0.06);
+      const cloudGrad = hctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, w*0.12);
+      cloudGrad.addColorStop(0,   `rgba(180,190,215,${cloudAlpha})`);
+      cloudGrad.addColorStop(1,   'rgba(140,155,195,0)');
+      hctx.fillStyle = cloudGrad;
+      hctx.beginPath();
+      hctx.ellipse(cx2, cy2, w*0.12, h*0.04, 0, 0, Math.PI*2);
+      hctx.fill();
+    }
+
+    // ── 最前景の暗いシルエット草むら ──
+    hctx.fillStyle = 'rgba(8,10,20,0.92)';
+    hctx.beginPath();
+    hctx.moveTo(0, h);
+    const grassPts = [
+      [0,0.95],[0.03,0.90],[0.06,0.94],[0.09,0.88],[0.12,0.93],
+      [0.16,0.87],[0.20,0.92],[0.25,0.88],[0.30,0.93],[0.36,0.87],
+      [0.42,0.91],[0.48,0.88],[0.54,0.93],[0.60,0.87],[0.66,0.92],
+      [0.72,0.88],[0.78,0.93],[0.84,0.88],[0.90,0.93],[0.95,0.89],[1.0,0.94]
+    ];
+    grassPts.forEach(p=> hctx.lineTo(p[0]*w, p[1]*h));
+    hctx.lineTo(w, h);
+    hctx.closePath();
+    hctx.fill();
+  }
+
   function offerHiddenScene(){
     scene='hidden-offer';
     setLine('A somewhat special night.', 'Would you like to gently touch it?');
@@ -929,6 +1201,15 @@
     tapHint.classList.remove('show');
     setLine('', '');
     hiddenScene.classList.add('show');
+    // ハイランドシーンのアニメーションループ開始
+    if(highlandRAF) cancelAnimationFrame(highlandRAF);
+    let hStart = null;
+    function hLoop(ts){
+      if(!hStart) hStart = ts;
+      drawHighlandScene((ts - hStart)/1000);
+      highlandRAF = requestAnimationFrame(hLoop);
+    }
+    highlandRAF = requestAnimationFrame(hLoop);
   }
 
   soundToggle.addEventListener('click', (e)=>{
