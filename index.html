@@ -463,6 +463,9 @@
     if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
     birdCanvas.classList.remove('show');
     bctx.clearRect(0,0,W,H);
+    cctx.clearRect(0,0,W,H);
+    particles = [];
+    moonEl.classList.remove('lit');
     const _wr = document.getElementById('word-reveal');
     if(_wr) _wr.innerHTML = '';
     if(audioPlaying){ furusatoAudio.pause(); furusatoAudio.currentTime=0; audioPlaying=false; soundToggle.textContent='Listen, softly'; }
@@ -525,6 +528,10 @@
   function goBerries(){
     scene='berries';
     hideChoices();
+    tapHint.classList.remove('show');
+    cctx.clearRect(0,0,W,H);
+    particles = [];
+    moonEl.classList.remove('lit');
     setLine('Summer\u2019s fruit glows around the moon.', '');
     const mr = moonRect();
     const cx = mr.left + mr.width/2;
@@ -2279,8 +2286,18 @@
 
   stage.addEventListener('click', (e)=>{
     if(e.target.closest('#choice-row') || e.target.closest('#input-row') || e.target.closest('#hidden-scene')) return;
-    if(scene==='intro') goPrompt();
+    if(scene==='intro') goBerries();
+    else if(scene==='prompt') goBerries();
     else if(scene==='berries-wait') goRelease();
+    else if(scene==='bird'){
+      // 小鳥シーン中タップでスキップ
+      if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
+      birdCanvas.classList.remove('show');
+      bctx.clearRect(0,0,W,H);
+      const _wr2 = document.getElementById('word-reveal');
+      if(_wr2) _wr2.innerHTML = '';
+      setTimeout(()=>{ tapHint.classList.add('show'); scene='berries-wait'; }, 600);
+    }
     else if(scene==='hidden-offer') revealHiddenScene();
     else if(scene==='end') goIntro();
   });
