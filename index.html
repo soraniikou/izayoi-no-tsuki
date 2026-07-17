@@ -990,20 +990,26 @@
     headGrad.addColorStop(0,   `rgba(${lerpC([255,255,255],[145,95,40],morphT).join(',')},0.97)`);
     headGrad.addColorStop(0.6, `rgba(${lerpC([230,238,252],[100,65,25],morphT).join(',')},0.9)`);
     headGrad.addColorStop(1,   `rgba(${lerpC([190,205,235],[70,45,18],morphT).join(',')},0.6)`);
-    // 頭の形：morphTに応じて上部が尖る（鷹らしいシルエット）
-    const sharpness = morphT * headR * 0.32; // 尖り量
     ctx.beginPath();
-    ctx.moveTo(headX, headY - headR - sharpness); // 尖った頂点
-    ctx.bezierCurveTo(
-      headX + headR*0.75, headY - headR*0.55,
-      headX + headR,      headY + headR*0.45,
-      headX,              headY + headR
-    );
-    ctx.bezierCurveTo(
-      headX - headR,      headY + headR*0.45,
-      headX - headR*0.75, headY - headR*0.55,
-      headX,              headY - headR - sharpness
-    );
+    if(morphT < 0.5){
+      // シマエナガ：丸い頭（真円）
+      ctx.arc(headX, headY, headR, 0, Math.PI*2);
+    } else {
+      // 鷹：前方（くちばし側）がやや尖るシルエット
+      const hawkT = (morphT - 0.5) / 0.5; // 0→1
+      const fwdSharp = hawkT * headR * 0.28; // 前方の尖り
+      ctx.moveTo(headX + headR + fwdSharp, headY); // 前方先端
+      ctx.bezierCurveTo(
+        headX + headR*0.6,  headY - headR*0.95,
+        headX - headR*0.5,  headY - headR,
+        headX - headR*0.85, headY
+      );
+      ctx.bezierCurveTo(
+        headX - headR*0.5,  headY + headR,
+        headX + headR*0.6,  headY + headR*0.95,
+        headX + headR + fwdSharp, headY
+      );
+    }
     ctx.fillStyle = headGrad;
     ctx.fill();
 
@@ -1059,17 +1065,22 @@
       ctx.closePath();
       ctx.fill();
     } else {
-      // 鷹の鉤型くちばし
+      // 鷹の鋭い鉤型くちばし（より尖らせる）
       const bkA = (morphT-0.5)/0.5;
-      const bkSize = headR*(0.28 + bkA*0.18);
       ctx.beginPath();
-      ctx.moveTo(eyeX + headR*0.15, eyeY + headR*0.02);
+      // 上部の稜線（鋭く前に突き出す）
+      ctx.moveTo(eyeX + headR*0.18, eyeY - headR*0.04);
       ctx.bezierCurveTo(
-        eyeX + headR*0.5, eyeY - headR*0.04,
-        eyeX + headR*(0.5 + bkA*0.2), eyeY + headR*(0.1 + bkA*0.18),
-        eyeX + headR*(0.32 + bkA*0.1), eyeY + headR*(0.22 + bkA*0.18)
+        eyeX + headR*0.55, eyeY - headR*0.14,
+        eyeX + headR*(0.72 + bkA*0.28), eyeY + headR*(0.02 + bkA*0.08),
+        eyeX + headR*(0.68 + bkA*0.32), eyeY + headR*(0.18 + bkA*0.22) // 尖った先端
       );
-      ctx.lineTo(eyeX + headR*0.15, eyeY + headR*0.14);
+      // 下部（切れ込み・返し）
+      ctx.bezierCurveTo(
+        eyeX + headR*(0.48 + bkA*0.15), eyeY + headR*(0.14 + bkA*0.12),
+        eyeX + headR*0.28, eyeY + headR*0.22,
+        eyeX + headR*0.18, eyeY + headR*0.15
+      );
       ctx.closePath();
       ctx.fill();
     }
@@ -1238,13 +1249,45 @@
       bctx.restore();
     }
 
-    // ── 遠景の丘と湖 ──
-    const hillColor = lerpC([22,28,52],[18,55,28],dawnT*0.8);
-    bctx.fillStyle = `rgba(${hillColor.join(',')},0.90)`;
+    // ── 遠景の丘（なだらかな緑の山並み・3層）──
+    // 最遠景（薄い青緑）
+    const hillFar = lerpC([30,35,62],[28,72,48],dawnT*0.85);
+    bctx.fillStyle = `rgba(${hillFar.join(',')},0.72)`;
     bctx.beginPath();
     bctx.moveTo(0, h);
-    [[0,0.82],[0.12,0.74],[0.25,0.70],[0.38,0.73],[0.50,0.68],[0.62,0.72],[0.75,0.68],[0.88,0.72],[1,0.76]].forEach(([px,py])=>
-      bctx.lineTo(px*w, py*h));
+    bctx.lineTo(0, h*0.72);
+    bctx.bezierCurveTo(w*0.12, h*0.62, w*0.22, h*0.66, w*0.32, h*0.64);
+    bctx.bezierCurveTo(w*0.42, h*0.62, w*0.50, h*0.58, w*0.60, h*0.61);
+    bctx.bezierCurveTo(w*0.70, h*0.64, w*0.80, h*0.60, w*0.90, h*0.63);
+    bctx.bezierCurveTo(w*0.96, h*0.65, w*1.0,  h*0.67, w*1.0,  h*0.67);
+    bctx.lineTo(w, h);
+    bctx.closePath();
+    bctx.fill();
+
+    // 中景（深い緑）
+    const hillMid = lerpC([22,32,50],[20,62,35],dawnT*0.85);
+    bctx.fillStyle = `rgba(${hillMid.join(',')},0.85)`;
+    bctx.beginPath();
+    bctx.moveTo(0, h);
+    bctx.lineTo(0, h*0.80);
+    bctx.bezierCurveTo(w*0.10, h*0.72, w*0.20, h*0.75, w*0.30, h*0.71);
+    bctx.bezierCurveTo(w*0.40, h*0.68, w*0.50, h*0.73, w*0.60, h*0.70);
+    bctx.bezierCurveTo(w*0.72, h*0.67, w*0.82, h*0.71, w*0.92, h*0.69);
+    bctx.bezierCurveTo(w*0.97, h*0.68, w*1.0,  h*0.72, w*1.0,  h*0.72);
+    bctx.lineTo(w, h);
+    bctx.closePath();
+    bctx.fill();
+
+    // 前景（最も濃い緑）
+    const hillNear = lerpC([15,22,40],[14,50,28],dawnT*0.85);
+    bctx.fillStyle = `rgba(${hillNear.join(',')},0.94)`;
+    bctx.beginPath();
+    bctx.moveTo(0, h);
+    bctx.lineTo(0, h*0.88);
+    bctx.bezierCurveTo(w*0.08, h*0.82, w*0.18, h*0.84, w*0.28, h*0.80);
+    bctx.bezierCurveTo(w*0.38, h*0.77, w*0.48, h*0.81, w*0.58, h*0.78);
+    bctx.bezierCurveTo(w*0.70, h*0.75, w*0.80, h*0.79, w*0.90, h*0.76);
+    bctx.bezierCurveTo(w*0.96, h*0.74, w*1.0,  h*0.77, w*1.0,  h*0.77);
     bctx.lineTo(w, h);
     bctx.closePath();
     bctx.fill();
