@@ -884,18 +884,568 @@
   // ---------- 小鳥シーン ----------
   let birdRAF = null;
 
+  // ── ヘルパー：色を線形補間 ──
+  function lerpC(a, b, t){
+    return a.map((v,i)=> Math.round(v + (b[i]-v)*t));
+  }
+
+  // ── 鷹を描画する関数 ──
+  function drawHawk(ctx, cx, cy, size, wingSpread, alpha, morphT){
+    // morphT: 0=シマエナガ, 1=鷹
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // 体色：白→茶色（鷹）
+    const bodyColor = lerpC([255,255,255], [120,75,30], morphT);
+    const wingColor = lerpC([195,205,230], [80,50,20], morphT);
+    const bellyColor = lerpC([240,244,252], [200,175,120], morphT);
+
+    // 翼（左右に大きく広がる）
+    const wSpan = size * (1.2 + wingSpread * 2.2);
+    [-1, 1].forEach(side=>{
+      ctx.save();
+      ctx.translate(cx + side * size * 0.15, cy - size * 0.05);
+      // 翼の形（ベジェで鷹らしい翼型）
+      const wTip = side * wSpan;
+      const wMid = side * wSpan * 0.55;
+      const wDip = size * (0.18 + wingSpread * 0.3);  // 翼の反り
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(wMid*0.4, -wDip*0.5, wMid*0.85, -wDip, wMid, -wDip*0.2);
+      ctx.bezierCurveTo(wMid*1.1, wDip*0.1, wTip*0.85, wDip*0.3, wTip, wDip*0.15);
+      ctx.bezierCurveTo(wTip*0.9, wDip*0.6, wMid*1.1, wDip*0.7, wMid*0.6, wDip*0.55);
+      ctx.bezierCurveTo(wMid*0.2, wDip*0.4, 0, wDip*0.2, 0, 0);
+      ctx.closePath();
+      const wGrad = ctx.createLinearGradient(0, -wDip, wTip, wDip*0.5);
+      wGrad.addColorStop(0,   `rgba(${wingColor[0]},${wingColor[1]},${wingColor[2]},0.92)`);
+      wGrad.addColorStop(0.5, `rgba(${lerpC(wingColor,[60,38,14],0.4).join(',')},0.88)`);
+      wGrad.addColorStop(1,   `rgba(${lerpC(wingColor,[40,28,10],0.6).join(',')},0.75)`);
+      ctx.fillStyle = wGrad;
+      ctx.fill();
+      // 羽根の筋
+      ctx.strokeStyle = `rgba(${lerpC([200,210,235],[50,32,10],morphT).join(',')},0.35)`;
+      ctx.lineWidth = size*0.018;
+      for(let wi=0; wi<6; wi++){
+        const wf = wi/5;
+        ctx.beginPath();
+        ctx.moveTo(wMid*wf*0.3, wDip*wf*0.1);
+        ctx.lineTo(wTip*wf + side*size*0.1*(1-wf), wDip*(0.15+wf*0.3));
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    // 尾羽（鷹らしい扇形）
+    ctx.save();
+    const tailLen = size * (1.2 + morphT * 0.8);
+    const tailSpread = size * (0.35 + morphT * 0.45);
+    for(let ti=-2; ti<=2; ti++){
+      const ta = (ti/3) * (0.4 + morphT*0.25);
+      ctx.strokeStyle = `rgba(${lerpC([75,78,100],[90,58,20],morphT).join(',')},0.85)`;
+      ctx.lineWidth = size*0.065;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.sin(ta)*size*0.18, cy + size*0.45);
+      ctx.bezierCurveTo(
+        cx + Math.sin(ta)*tailSpread*0.5, cy + tailLen*0.6,
+        cx + Math.sin(ta)*tailSpread*0.85, cy + tailLen*0.85,
+        cx + Math.sin(ta)*tailSpread, cy + tailLen
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 腹部（白〜薄茶）
+    const bellyGrad = ctx.createRadialGradient(cx, cy+size*0.1, 0, cx, cy, size*0.7);
+    bellyGrad.addColorStop(0,   `rgba(${bellyColor.join(',')},0.92)`);
+    bellyGrad.addColorStop(0.6, `rgba(${lerpC(bellyColor,bodyColor,0.5).join(',')},0.82)`);
+    bellyGrad.addColorStop(1,   `rgba(${bodyColor.join(',')},0.4)`);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size*0.05, size*0.42, size*0.52, 0, 0, Math.PI*2);
+    ctx.fillStyle = bellyGrad;
+    ctx.fill();
+
+    // 体本体（上半分）
+    const bodyGrad2 = ctx.createRadialGradient(cx-size*0.15, cy-size*0.2, 0, cx, cy, size*0.72);
+    bodyGrad2.addColorStop(0,   `rgba(${lerpC(bodyColor,[200,165,100],0.3).join(',')},0.95)`);
+    bodyGrad2.addColorStop(0.55, `rgba(${bodyColor.join(',')},0.88)`);
+    bodyGrad2.addColorStop(1,   `rgba(${lerpC(bodyColor,[60,40,15],0.5).join(',')},0.55)`);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - size*0.05, size*(0.55 - morphT*0.08), size*(0.62 - morphT*0.08), 0, 0, Math.PI*2);
+    ctx.fillStyle = bodyGrad2;
+    ctx.fill();
+
+    // 頭部
+    const headR = size * (0.42 - morphT*0.06);
+    const headX = cx - size*(0.05 - morphT*0.08);
+    const headY = cy - size*(0.5 + morphT*0.05);
+    const headGrad = ctx.createRadialGradient(headX-headR*0.2, headY-headR*0.2, 0, headX, headY, headR);
+    headGrad.addColorStop(0,   `rgba(${lerpC([255,255,255],[145,95,40],morphT).join(',')},0.97)`);
+    headGrad.addColorStop(0.6, `rgba(${lerpC([230,238,252],[100,65,25],morphT).join(',')},0.9)`);
+    headGrad.addColorStop(1,   `rgba(${lerpC([190,205,235],[70,45,18],morphT).join(',')},0.6)`);
+    ctx.beginPath();
+    ctx.arc(headX, headY, headR, 0, Math.PI*2);
+    ctx.fillStyle = headGrad;
+    ctx.fill();
+
+    // 鷹の頭の暗い模様（morphT > 0.3から）
+    if(morphT > 0.3){
+      const maskA = (morphT - 0.3) / 0.7;
+      ctx.save();
+      ctx.globalAlpha = maskA * 0.75;
+      ctx.fillStyle = `rgba(55,35,10,0.85)`;
+      ctx.beginPath();
+      ctx.ellipse(headX + headR*0.25, headY + headR*0.1, headR*0.3, headR*0.22, 0.5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 目
+    const eyeX = headX + headR*(0.22 + morphT*0.08);
+    const eyeY = headY + headR*0.05;
+    const eyeR = headR*(0.13 + morphT*0.04);
+    ctx.fillStyle = 'rgba(18,18,22,0.97)';
+    ctx.beginPath();
+    ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI*2);
+    ctx.fill();
+    // 鷹の鋭い目（黄色の虹彩）
+    if(morphT > 0.5){
+      const irisA = (morphT-0.5)/0.5;
+      ctx.save();
+      ctx.globalAlpha = irisA*0.9;
+      const irisGrad = ctx.createRadialGradient(eyeX, eyeY, 0, eyeX, eyeY, eyeR*1.5);
+      irisGrad.addColorStop(0,   'rgba(18,18,22,1)');
+      irisGrad.addColorStop(0.45,'rgba(180,130,20,0.95)');
+      irisGrad.addColorStop(1,   'rgba(140,95,10,0)');
+      ctx.beginPath();
+      ctx.arc(eyeX, eyeY, eyeR*1.5, 0, Math.PI*2);
+      ctx.fillStyle = irisGrad;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.beginPath();
+    ctx.arc(eyeX + eyeR*0.35, eyeY - eyeR*0.35, eyeR*0.32, 0, Math.PI*2);
+    ctx.fill();
+
+    // くちばし（シマエナガ→鷹の鉤型へ）
+    ctx.save();
+    ctx.fillStyle = `rgba(${lerpC([80,75,65],[55,45,10],morphT).join(',')},0.92)`;
+    if(morphT < 0.5){
+      // シマエナガのくちばし
+      ctx.beginPath();
+      ctx.moveTo(eyeX + headR*0.15, eyeY + headR*0.06);
+      ctx.lineTo(eyeX + headR*(0.38 + morphT*0.2), eyeY + headR*0.12);
+      ctx.lineTo(eyeX + headR*0.15, eyeY + headR*0.18);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // 鷹の鉤型くちばし
+      const bkA = (morphT-0.5)/0.5;
+      const bkSize = headR*(0.28 + bkA*0.18);
+      ctx.beginPath();
+      ctx.moveTo(eyeX + headR*0.15, eyeY + headR*0.02);
+      ctx.bezierCurveTo(
+        eyeX + headR*0.5, eyeY - headR*0.04,
+        eyeX + headR*(0.5 + bkA*0.2), eyeY + headR*(0.1 + bkA*0.18),
+        eyeX + headR*(0.32 + bkA*0.1), eyeY + headR*(0.22 + bkA*0.18)
+      );
+      ctx.lineTo(eyeX + headR*0.15, eyeY + headR*0.14);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // ── 飛翔する鷹（画面外へ）──
+  function drawFlyingHawk(ctx, cx, cy, size, angle, alpha){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    // 翼（大きく広げた状態）
+    [-1,1].forEach(side=>{
+      ctx.save();
+      const wSpan = size*2.8;
+      ctx.strokeStyle = 'rgba(95,62,22,0.82)';
+      ctx.fillStyle = 'rgba(105,68,25,0.78)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(side*wSpan*0.3, -size*0.3, side*wSpan*0.75, -size*0.22, side*wSpan, size*0.12);
+      ctx.bezierCurveTo(side*wSpan*0.85, size*0.45, side*wSpan*0.5, size*0.5, 0, size*0.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
+    // 体
+    ctx.fillStyle = 'rgba(110,70,25,0.88)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size*0.28, size*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 腹
+    ctx.fillStyle = 'rgba(195,170,115,0.75)';
+    ctx.beginPath();
+    ctx.ellipse(0, size*0.1, size*0.18, size*0.32, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 尾羽
+    for(let ti=-2;ti<=2;ti++){
+      ctx.strokeStyle = 'rgba(88,56,18,0.78)';
+      ctx.lineWidth = size*0.08;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(ti*size*0.1, size*0.48);
+      ctx.lineTo(ti*size*0.22, size*0.9);
+      ctx.stroke();
+    }
+    // 頭
+    ctx.fillStyle = 'rgba(130,88,35,0.92)';
+    ctx.beginPath();
+    ctx.arc(0, -size*0.48, size*0.22, 0, Math.PI*2);
+    ctx.fill();
+    // 目
+    ctx.fillStyle = 'rgba(18,18,20,0.95)';
+    ctx.beginPath();
+    ctx.arc(size*0.08, -size*0.5, size*0.06, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(size*0.10, -size*0.53, size*0.022, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawBirdScene(t){
     const w = W, h = H;
     bctx.clearRect(0, 0, w, h);
 
-    // ── 夜空（深い青）──
+    // ────────────────────────────────────
+    // フェーズ定義
+    //  Phase A: 0  ~ 10s  シマエナガが枝の上でくるくる回転
+    //  Phase B: 10 ~ 14s  鷹へグラデーション変化
+    //  Phase C: 14 ~ 28s  鷹が四方八方に飛翔、夜明け背景
+    // ────────────────────────────────────
+    const PHASE_A_END  = 10;
+    const PHASE_B_END  = 14;
+    const PHASE_C_END  = 28;
+
+    const inA = t < PHASE_A_END;
+    const inB = t >= PHASE_A_END && t < PHASE_B_END;
+    const inC = t >= PHASE_B_END;
+
+    // morphT: 0=シマエナガ 1=鷹（フェーズBで0→1）
+    const morphT = inA ? 0 : inB ? Math.min((t - PHASE_A_END)/(PHASE_B_END - PHASE_A_END), 1) : 1;
+
+    // 夜明け進行度（フェーズBから明けていく）
+    const dawnT = inA ? 0 : inB ? Math.min((t - PHASE_A_END)/4, 1)*0.3
+                             : Math.min((t - PHASE_B_END)/(PHASE_C_END - PHASE_B_END), 1);
+
+    // ── 背景：深夜→夜明け ──
     const sky = bctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0,    'rgba(8,12,32,0.97)');
-    sky.addColorStop(0.55, 'rgba(18,24,58,0.96)');
-    sky.addColorStop(0.82, 'rgba(30,22,55,0.93)');
-    sky.addColorStop(1,    'rgba(12,10,28,0.97)');
+    // 上
+    const nightTop  = [8,12,32];
+    const dawnTop   = [45,30,68];
+    const cTop = lerpC(nightTop, dawnTop, dawnT);
+    // 中
+    const nightMid  = [18,24,58];
+    const dawnMid   = [180,95,60];
+    const cMid = lerpC(nightMid, dawnMid, dawnT);
+    // 下
+    const nightBot  = [12,10,28];
+    const dawnBot   = [235,155,70];
+    const cBot = lerpC(nightBot, dawnBot, dawnT);
+
+    sky.addColorStop(0,    `rgba(${cTop.join(',')},0.97)`);
+    sky.addColorStop(0.45, `rgba(${lerpC(cTop,cMid,0.5).join(',')},0.96)`);
+    sky.addColorStop(0.75, `rgba(${cMid.join(',')},0.94)`);
+    sky.addColorStop(1,    `rgba(${cBot.join(',')},0.97)`);
     bctx.fillStyle = sky;
     bctx.fillRect(0, 0, w, h);
+
+    // 夜明けの光（地平線上のグロー）
+    if(dawnT > 0){
+      const horizY = h * 0.65;
+      const sunGrad = bctx.createRadialGradient(w*0.5, horizY, 0, w*0.5, horizY, w*0.55);
+      sunGrad.addColorStop(0,   `rgba(255,200,80,${dawnT*0.55})`);
+      sunGrad.addColorStop(0.3, `rgba(240,130,50,${dawnT*0.28})`);
+      sunGrad.addColorStop(0.7, `rgba(200,80,40,${dawnT*0.10})`);
+      sunGrad.addColorStop(1,   'rgba(150,50,30,0)');
+      bctx.fillStyle = sunGrad;
+      bctx.fillRect(0, 0, w, h);
+    }
+
+    // ── 星（夜明けとともに消えていく）──
+    const starAlpha = Math.max(0, 1 - dawnT*1.6);
+    if(starAlpha > 0){
+      const starData = [
+        [0.08,0.07,0.9],[0.18,0.04,0.7],[0.32,0.11,1.0],[0.45,0.05,0.8],
+        [0.62,0.09,0.9],[0.73,0.03,0.6],[0.85,0.07,1.0],[0.91,0.13,0.7],
+        [0.12,0.18,0.6],[0.28,0.15,0.8],[0.55,0.17,0.7],[0.78,0.12,0.9],
+        [0.04,0.28,0.5],[0.38,0.22,0.6],[0.67,0.25,0.8],[0.94,0.20,0.7],
+      ];
+      starData.forEach(([sx,sy,br],i)=>{
+        const twinkle = 0.55 + 0.45*Math.sin(t*0.9 + i*1.7);
+        bctx.beginPath();
+        bctx.arc(sx*w, sy*h, 1.1*br, 0, Math.PI*2);
+        bctx.fillStyle = `rgba(220,228,248,${twinkle*br*starAlpha})`;
+        bctx.fill();
+      });
+    }
+
+    // ── 三日月（夜明けとともに薄れる）──
+    if(dawnT < 0.8){
+      const moonA = Math.max(0, 1 - dawnT/0.8);
+      const mox = w*0.82, moy = h*0.12, mr = w*0.048;
+      bctx.save();
+      bctx.globalAlpha = moonA;
+      bctx.beginPath();
+      bctx.arc(mox, moy, mr, -0.35, Math.PI+0.35);
+      bctx.fillStyle = 'rgba(235,235,210,0.92)';
+      bctx.fill();
+      bctx.beginPath();
+      bctx.arc(mox + mr*0.38, moy - mr*0.08, mr*0.84, -0.55, Math.PI+0.55);
+      bctx.fillStyle = 'rgba(14,20,48,0.98)';
+      bctx.fill();
+      bctx.restore();
+    }
+
+    // ── 遠景の丘と湖 ──
+    const hillColor = lerpC([22,28,52],[60,45,30],dawnT*0.7);
+    bctx.fillStyle = `rgba(${hillColor.join(',')},0.88)`;
+    bctx.beginPath();
+    bctx.moveTo(0, h);
+    [[0,0.82],[0.12,0.74],[0.25,0.70],[0.38,0.73],[0.50,0.68],[0.62,0.72],[0.75,0.68],[0.88,0.72],[1,0.76]].forEach(([px,py])=>
+      bctx.lineTo(px*w, py*h));
+    bctx.lineTo(w, h);
+    bctx.closePath();
+    bctx.fill();
+
+    // 湖面の反射（夜明けは橙〜赤）
+    const refX = w*0.62, refY = h*0.82;
+    const refColor = dawnT > 0.1 ? `rgba(255,${Math.round(160+dawnT*60)},${Math.round(80-dawnT*50)},` : 'rgba(220,225,200,';
+    const refGrad = bctx.createRadialGradient(refX, refY, 0, refX, refY, w*0.14);
+    refGrad.addColorStop(0,   `${refColor}${0.22+dawnT*0.15})`);
+    refGrad.addColorStop(0.5, `${refColor}0.08)`);
+    refGrad.addColorStop(1,   `${refColor}0)`);
+    bctx.save();
+    bctx.scale(1, 0.28);
+    bctx.beginPath();
+    bctx.ellipse(refX, refY/0.28, w*0.1, w*0.1, 0, 0, Math.PI*2);
+    bctx.fillStyle = refGrad;
+    bctx.fill();
+    bctx.restore();
+
+    // ────────────────────────────────────
+    // フェーズA / B: 枝の上でシマエナガ → 鷹へ変化
+    // ────────────────────────────────────
+    if(!inC){
+      // ── 枝（フェーズABのみ表示）──
+      const branchX0 = w*0.05, branchY0 = h*0.58;
+      const branchX1 = w*0.70, branchY1 = h*0.47;
+      bctx.save();
+      bctx.strokeStyle = 'rgba(62,58,75,0.92)';
+      bctx.lineWidth = w*0.0055;
+      bctx.lineCap = 'round';
+      bctx.beginPath();
+      bctx.moveTo(branchX0, branchY0);
+      bctx.bezierCurveTo(w*0.25, h*0.52, w*0.48, h*0.50, branchX1, branchY1);
+      bctx.stroke();
+      // 小枝
+      const twigs = [
+        {t:0.18,dx:-0.04,dy:-0.06,len:0.09,a:-0.6},{t:0.32,dx:-0.02,dy:-0.08,len:0.07,a:-0.8},
+        {t:0.55,dx:0.01,dy:-0.07,len:0.08,a:-0.5},{t:0.72,dx:0.03,dy:-0.09,len:0.06,a:-0.7},
+        {t:0.85,dx:0.02,dy:-0.06,len:0.05,a:-0.4},{t:0.22,dx:-0.03,dy:0.05,len:0.06,a:0.5},
+        {t:0.65,dx:0.02,dy:0.04,len:0.05,a:0.6},
+      ];
+      bctx.lineWidth = w*0.002;
+      bctx.strokeStyle = 'rgba(58,54,70,0.78)';
+      twigs.forEach(tw=>{
+        const bx2 = branchX0 + (branchX1-branchX0)*tw.t;
+        const by2 = branchY0 + (branchY1-branchY0)*tw.t;
+        bctx.beginPath();
+        bctx.moveTo(bx2, by2);
+        bctx.lineTo(bx2 + Math.cos(tw.a)*tw.len*w, by2 + Math.sin(tw.a)*tw.len*h*0.5);
+        bctx.stroke();
+      });
+      bctx.restore();
+
+      // ── 回転するシマエナガ→鷹 ──
+      // 枝の上の定位置を中心に回転
+      const pivotX = w * 0.35;
+      const pivotY = h * 0.47;
+      const birdR  = Math.min(w, h) * 0.10;
+
+      // フェーズA: 10秒かけて1回転（2π）
+      const spinAngle = inA ? (t / PHASE_A_END) * Math.PI * 2 : Math.PI * 2;
+      // 回転による位置オフセット（小さな円軌道）
+      const orbitR = birdR * 0.35;
+      const birdCX = pivotX + Math.sin(spinAngle) * orbitR;
+      const birdCY = pivotY + Math.cos(spinAngle) * orbitR * 0.4;
+
+      // 翼の広がり：変化フェーズBで翼が開く
+      const wingSpread = morphT;
+
+      bctx.save();
+      bctx.translate(birdCX, birdCY);
+      bctx.rotate(Math.sin(spinAngle) * 0.15); // 体のわずかな傾き
+      bctx.translate(-birdCX, -birdCY);
+      drawHawk(bctx, birdCX, birdCY, birdR, wingSpread, 1.0, morphT);
+      bctx.restore();
+    }
+
+    // ────────────────────────────────────
+    // フェーズC: 鷹が四方八方に飛翔
+    // ────────────────────────────────────
+    if(inC){
+      const ct = t - PHASE_B_END; // 0~ (フェーズC内の時間)
+      const totalC = PHASE_C_END - PHASE_B_END; // 14s
+
+      // 鷹が複数方向に飛んでいく（時間差で）
+      const hawks = [
+        {delay:0.0, angle:-Math.PI/2,        // 真上
+          sx:0.5, sy:0.55, speed:0.068},
+        {delay:2.5, angle:-Math.PI/6,         // 右上
+          sx:0.45, sy:0.58, speed:0.060},
+        {delay:4.5, angle:Math.PI+Math.PI/5,  // 左下
+          sx:0.52, sy:0.52, speed:0.055},
+        {delay:6.0, angle:-Math.PI*0.78,      // 左上
+          sx:0.5, sy:0.55, speed:0.062},
+        {delay:8.0, angle:Math.PI/4,          // 右下
+          sx:0.48, sy:0.56, speed:0.058},
+        {delay:10.0, angle:-Math.PI*0.15,     // 右
+          sx:0.5, sy:0.53, speed:0.065},
+      ];
+
+      hawks.forEach((hk, hi)=>{
+        const localT = ct - hk.delay;
+        if(localT < 0) return;
+        const dist = localT * hk.speed * Math.max(w, h);
+        const hx = hk.sx*w + Math.cos(hk.angle)*dist;
+        const hy = hk.sy*h + Math.sin(hk.angle)*dist;
+        // 画面外に出たら描画しない
+        if(hx < -w*0.3 || hx > w*1.3 || hy < -h*0.3 || hy > h*1.3) return;
+        const hSize = Math.min(w,h) * (0.07 - hi*0.003);
+        // フェードイン（0.5秒）
+        const fadeIn = Math.min(localT/0.5, 1);
+        // 遠ざかるにつれて小さく・薄く
+        const progress = dist / (Math.max(w,h)*0.8);
+        const scale = Math.max(0.25, 1 - progress*0.6);
+        const alpha = fadeIn * Math.max(0.1, 1 - progress*0.75);
+        // 羽ばたき角度（上下に揺れる翼）
+        const flapAngle = hk.angle + Math.sin(localT*4.5)*0.22;
+        drawFlyingHawk(bctx, hx, hy, hSize*scale, flapAngle - Math.PI/2, alpha);
+      });
+
+      // 光の軌跡（鷹が通った後に輝く粒）
+      if(ct > 0.5){
+        hawks.forEach((hk, hi)=>{
+          const localT = ct - hk.delay - 0.3;
+          if(localT < 0) return;
+          for(let pi=0; pi<5; pi++){
+            const pT = localT - pi*0.4;
+            if(pT < 0) continue;
+            const pdist = pT * hk.speed * Math.max(w,h);
+            const px2 = hk.sx*w + Math.cos(hk.angle)*pdist;
+            const py2 = hk.sy*h + Math.sin(hk.angle)*pdist;
+            if(px2 < -w*0.2 || px2 > w*1.2 || py2 < -h*0.2 || py2 > h*1.2) continue;
+            const trailA = Math.max(0, 0.35 - pi*0.07 - pT*0.04);
+            bctx.beginPath();
+            bctx.arc(px2, py2, 3 - pi*0.4, 0, Math.PI*2);
+            bctx.fillStyle = `rgba(255,${200+dawnT*55|0},${80+dawnT*80|0},${trailA})`;
+            bctx.fill();
+          }
+        });
+      }
+    }
+
+    // ── 輝く葉（フェーズA・Bのみ）──
+    if(!inC){
+      const leafData = [
+        {bx:0.52, by:0.46, phase:0.0, speed:0.22, drift:0.018},
+        {bx:0.60, by:0.43, phase:1.3, speed:0.18, drift:0.024},
+        {bx:0.66, by:0.48, phase:2.5, speed:0.20, drift:0.015},
+        {bx:0.70, by:0.41, phase:0.8, speed:0.25, drift:0.020},
+        {bx:0.76, by:0.44, phase:3.5, speed:0.17, drift:0.022},
+        {bx:0.82, by:0.38, phase:1.8, speed:0.23, drift:0.016},
+      ];
+      leafData.forEach((ld, i)=>{
+        const age = (t*ld.speed + ld.phase) % 1.0;
+        const lx = (ld.bx + age*ld.drift*8 + Math.sin(t*0.4+i)*0.03) * w;
+        const ly = (ld.by - age*0.12 + Math.sin(t*0.5+i*0.9)*0.025) * h;
+        const lAlpha = age < 0.2 ? age/0.2 : age > 0.75 ? (1-age)/0.25 : 1;
+        const lRot = t*0.3 + ld.phase + Math.sin(t*0.35+i)*0.4;
+        const lSize = w * (0.022 + Math.sin(i*0.7)*0.006);
+        bctx.save();
+        bctx.translate(lx, ly);
+        bctx.rotate(lRot);
+        bctx.globalAlpha = lAlpha * 0.88;
+        const leafGlow = bctx.createRadialGradient(0, 0, 0, 0, 0, lSize*1.6);
+        leafGlow.addColorStop(0,   'rgba(210,225,245,0.45)');
+        leafGlow.addColorStop(0.5, 'rgba(180,205,235,0.18)');
+        leafGlow.addColorStop(1,   'rgba(150,185,225,0)');
+        bctx.beginPath();
+        bctx.ellipse(0, 0, lSize*1.6, lSize*1.0, 0, 0, Math.PI*2);
+        bctx.fillStyle = leafGlow;
+        bctx.fill();
+        bctx.beginPath();
+        bctx.moveTo(0, -lSize);
+        bctx.bezierCurveTo(lSize*0.7, -lSize*0.5, lSize*0.8, lSize*0.3, 0, lSize);
+        bctx.bezierCurveTo(-lSize*0.8, lSize*0.3, -lSize*0.7, -lSize*0.5, 0, -lSize);
+        bctx.fillStyle = 'rgba(215,228,248,0.72)';
+        bctx.fill();
+        bctx.strokeStyle = 'rgba(240,245,255,0.5)';
+        bctx.lineWidth = 0.8;
+        bctx.beginPath();
+        bctx.moveTo(0, -lSize*0.85);
+        bctx.lineTo(0, lSize*0.85);
+        bctx.stroke();
+        bctx.restore();
+      });
+    }
+
+    // ── きらめき（フェーズA・B）──
+    if(!inC){
+      const sparklePos = [
+        [0.58,0.38],[0.65,0.44],[0.72,0.35],[0.79,0.41],[0.86,0.36],[0.68,0.30]
+      ];
+      sparklePos.forEach(([sx,sy],i)=>{
+        const sPhase = t*1.2 + i*1.1;
+        const sBright = 0.5 + 0.5*Math.sin(sPhase);
+        const sX = sx*w + Math.sin(t*0.2+i)*w*0.008;
+        const sY = sy*h + Math.cos(t*0.25+i)*h*0.012;
+        const sR = w*0.005 * sBright;
+        bctx.save();
+        bctx.globalAlpha = sBright * 0.85;
+        bctx.fillStyle = 'rgba(255,248,210,0.95)';
+        bctx.translate(sX, sY);
+        bctx.rotate(t*0.2+i);
+        bctx.beginPath();
+        for(let sp=0;sp<8;sp++){
+          const sAngle = sp/8*Math.PI*2;
+          const sLen = sp%2===0 ? sR : sR*0.4;
+          sp===0 ? bctx.moveTo(Math.cos(sAngle)*sLen, Math.sin(sAngle)*sLen)
+                 : bctx.lineTo(Math.cos(sAngle)*sLen, Math.sin(sAngle)*sLen);
+        }
+        bctx.closePath();
+        bctx.fill();
+        bctx.restore();
+      });
+    }
+
+    // ── 最前景の草むら ──
+    const grassColor = lerpC([8,10,22],[35,28,15],dawnT*0.5);
+    bctx.fillStyle = `rgba(${grassColor.join(',')},0.94)`;
+    bctx.beginPath();
+    bctx.moveTo(0, h);
+    [[0,0.93],[0.05,0.88],[0.10,0.91],[0.15,0.86],[0.20,0.90],[0.28,0.87],
+     [0.35,0.91],[0.42,0.87],[0.50,0.92],[0.58,0.88],[0.66,0.91],[0.74,0.87],
+     [0.82,0.91],[0.90,0.88],[0.96,0.92],[1.0,0.90]].forEach(([px,py])=>
+      bctx.lineTo(px*w, py*h));
+    bctx.lineTo(w, h);
+    bctx.closePath();
+    bctx.fill();
+  }
 
     // ── 星（固定seed）──
     const starData = [
@@ -1293,7 +1843,7 @@
     }
     birdRAF = requestAnimationFrame(bLoop);
 
-    // メッセージを1単語ずつ表示（2秒後から開始）
+    // メッセージを1単語ずつ表示（2秒後から開始、フェーズA中）
     setTimeout(()=>{
       revealWords([
         'Like a little bird,',
@@ -1302,19 +1852,23 @@
       ], 320);
     }, 2000);
 
-    // 12秒後にフェードアウト → berries-wait へ
+    // フェーズB開始（10秒）：メッセージをフェードアウト
     setTimeout(()=>{
-      birdCanvas.classList.remove('show');
       const wr = document.getElementById('word-reveal');
       wr.querySelectorAll('.w').forEach(s=>{ s.classList.remove('on'); });
+      setTimeout(()=>{ wr.innerHTML = ''; }, 1200);
+    }, 10000);
+
+    // 28秒後にフェードアウト → berries-wait へ
+    setTimeout(()=>{
+      birdCanvas.classList.remove('show');
       setTimeout(()=>{
         if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
         bctx.clearRect(0, 0, W, H);
-        wr.innerHTML = '';
         tapHint.classList.add('show');
         scene = 'berries-wait';
       }, 2500);
-    }, 14000);
+    }, 28000);
   }
 
   function goRelease(){
