@@ -208,6 +208,7 @@
     color: rgba(210,218,235,0.88);
     text-shadow: 0 2px 16px rgba(5,10,25,0.95);
     letter-spacing: 0.03em;
+    pointer-events: none;
   }
   #sound-toggle{
     position:absolute; bottom:6vh; left:50%; transform:translateX(-50%);
@@ -224,6 +225,35 @@
     position:absolute; inset:0; width:100%; height:100%;
     pointer-events:none; z-index:3;
   }
+
+  /* ---------- 小鳥シーン ---------- */
+  #bird-canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    pointer-events:none; z-index:4;
+    opacity:0; transition: opacity 2.4s ease;
+  }
+  #bird-canvas.show{ opacity:1; }
+
+  #word-reveal{
+    position:absolute; bottom:14vh; left:50%; transform:translateX(-50%);
+    text-align:center; width:88%; max-width:560px;
+    font-family:'Shippori Mincho', serif;
+    font-size: clamp(15px, 2.2vmin, 20px);
+    line-height:1.95;
+    color: rgba(225,232,248,0.93);
+    text-shadow: 0 2px 18px rgba(5,10,28,0.96);
+    letter-spacing: 0.04em;
+    pointer-events:none; z-index:6;
+  }
+  #word-reveal .w{
+    display:inline-block;
+    opacity:0;
+    transform: translateY(5px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+    margin: 0 0.18em;
+  }
+  #word-reveal .w.on{ opacity:1; transform:translateY(0); }
+  #word-reveal .br{ display:block; height:0.5em; }
 </style>
 </head>
 <body>
@@ -235,6 +265,8 @@
   </div>
   <canvas id="particles"></canvas>
   <canvas id="clover-canvas"></canvas>
+  <canvas id="bird-canvas"></canvas>
+  <div id="word-reveal"></div>
   <div id="floating-word"></div>
 
   <div id="privacy">This stays only within you. Nothing you write is ever sent or saved.</div>
@@ -277,18 +309,21 @@
   const pctx = particlesCanvas.getContext('2d');
   const cloverCanvas = document.getElementById('clover-canvas');
   const cctx = cloverCanvas.getContext('2d');
+  const birdCanvas = document.getElementById('bird-canvas');
+  const bctx = birdCanvas.getContext('2d');
   let W, H, DPR;
 
   function resize(){
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth; H = window.innerHeight;
-    [starsCanvas, particlesCanvas, cloverCanvas].forEach(c=>{
+    [starsCanvas, particlesCanvas, cloverCanvas, birdCanvas].forEach(c=>{
       c.width = W*DPR; c.height = H*DPR;
       c.style.width = W+"px"; c.style.height = H+"px";
     });
     sctx.setTransform(DPR,0,0,DPR,0,0);
     pctx.setTransform(DPR,0,0,DPR,0,0);
     cctx.setTransform(DPR,0,0,DPR,0,0);
+    bctx.setTransform(DPR,0,0,DPR,0,0);
   }
   window.addEventListener('resize', resize);
   resize();
@@ -425,6 +460,11 @@
     tapHint.classList.remove('show');
     hiddenScene.classList.remove('show');
     if(highlandRAF){ cancelAnimationFrame(highlandRAF); highlandRAF=null; hctx.clearRect(0,0,window.innerWidth,window.innerHeight); }
+    if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
+    birdCanvas.classList.remove('show');
+    bctx.clearRect(0,0,W,H);
+    const _wr = document.getElementById('word-reveal');
+    if(_wr) _wr.innerHTML = '';
     if(audioPlaying){ furusatoAudio.pause(); furusatoAudio.currentTime=0; audioPlaying=false; soundToggle.textContent='Listen, softly'; }
     setLine('', '');
     setTimeout(()=>{
@@ -831,8 +871,7 @@
               requestAnimationFrame(fadeOut);
             } else {
               cctx.clearRect(0, 0, W, H);
-              tapHint.classList.add('show');
-              scene = 'berries-wait';
+              goBirdScene();
             }
           }
           requestAnimationFrame(fadeOut);
@@ -840,6 +879,442 @@
       }
     }
     requestAnimationFrame(animFrame);
+  }
+
+  // ---------- 小鳥シーン ----------
+  let birdRAF = null;
+
+  function drawBirdScene(t){
+    const w = W, h = H;
+    bctx.clearRect(0, 0, w, h);
+
+    // ── 夜空（深い青）──
+    const sky = bctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0,    'rgba(8,12,32,0.97)');
+    sky.addColorStop(0.55, 'rgba(18,24,58,0.96)');
+    sky.addColorStop(0.82, 'rgba(30,22,55,0.93)');
+    sky.addColorStop(1,    'rgba(12,10,28,0.97)');
+    bctx.fillStyle = sky;
+    bctx.fillRect(0, 0, w, h);
+
+    // ── 星（固定seed）──
+    const starData = [
+      [0.08,0.07,0.9],[0.18,0.04,0.7],[0.32,0.11,1.0],[0.45,0.05,0.8],
+      [0.62,0.09,0.9],[0.73,0.03,0.6],[0.85,0.07,1.0],[0.91,0.13,0.7],
+      [0.12,0.18,0.6],[0.28,0.15,0.8],[0.55,0.17,0.7],[0.78,0.12,0.9],
+      [0.04,0.28,0.5],[0.38,0.22,0.6],[0.67,0.25,0.8],[0.94,0.20,0.7],
+    ];
+    starData.forEach(([sx,sy,br],i)=>{
+      const twinkle = 0.55 + 0.45*Math.sin(t*0.9 + i*1.7);
+      bctx.beginPath();
+      bctx.arc(sx*w, sy*h, 1.1*br, 0, Math.PI*2);
+      bctx.fillStyle = `rgba(220,228,248,${twinkle*br})`;
+      bctx.fill();
+    });
+
+    // ── 三日月（右上）──
+    const mox = w*0.82, moy = h*0.12, mr = w*0.048;
+    bctx.save();
+    bctx.beginPath();
+    bctx.arc(mox, moy, mr, -0.35, Math.PI+0.35);
+    bctx.fillStyle = 'rgba(235,235,210,0.92)';
+    bctx.fill();
+    bctx.beginPath();
+    bctx.arc(mox + mr*0.38, moy - mr*0.08, mr*0.84, -0.55, Math.PI+0.55);
+    bctx.fillStyle = 'rgba(14,20,48,0.98)';
+    bctx.fill();
+    // 月の縁のグロー
+    const moonGlow = bctx.createRadialGradient(mox, moy, 0, mox, moy, mr*2.5);
+    moonGlow.addColorStop(0,   'rgba(230,228,195,0.15)');
+    moonGlow.addColorStop(0.5, 'rgba(200,205,230,0.06)');
+    moonGlow.addColorStop(1,   'rgba(170,180,220,0)');
+    bctx.beginPath();
+    bctx.arc(mox, moy, mr*2.5, 0, Math.PI*2);
+    bctx.fillStyle = moonGlow;
+    bctx.fill();
+    bctx.restore();
+
+    // ── 遠景の丘と湖 ──
+    const horizonY = h*0.72;
+    // 湖の水面反射（月明かり）
+    const lakeGrad = bctx.createLinearGradient(0, horizonY, 0, h*0.88);
+    lakeGrad.addColorStop(0,   'rgba(25,32,68,0.88)');
+    lakeGrad.addColorStop(0.5, 'rgba(18,24,50,0.94)');
+    lakeGrad.addColorStop(1,   'rgba(10,14,32,0.97)');
+    bctx.fillStyle = lakeGrad;
+    bctx.fillRect(0, horizonY, w, h - horizonY);
+
+    // 水面の月明かり反射
+    const refX = w*0.62, refY = h*0.82;
+    const refGrad = bctx.createRadialGradient(refX, refY, 0, refX, refY, w*0.12);
+    refGrad.addColorStop(0,   `rgba(220,225,200,${0.18+Math.sin(t*1.1)*0.04})`);
+    refGrad.addColorStop(0.4, 'rgba(180,195,220,0.07)');
+    refGrad.addColorStop(1,   'rgba(140,160,200,0)');
+    bctx.save();
+    bctx.scale(1, 0.28);
+    bctx.beginPath();
+    bctx.ellipse(refX, refY/0.28, w*0.1, w*0.1, 0, 0, Math.PI*2);
+    bctx.fillStyle = refGrad;
+    bctx.fill();
+    bctx.restore();
+
+    // 丘シルエット
+    bctx.fillStyle = 'rgba(22,28,52,0.88)';
+    bctx.beginPath();
+    bctx.moveTo(0, h);
+    [[0,0.82],[0.12,0.74],[0.25,0.70],[0.38,0.73],[0.50,0.68],[0.62,0.72],[0.75,0.68],[0.88,0.72],[1,0.76]].forEach(([px,py])=>
+      bctx.lineTo(px*w, py*h));
+    bctx.lineTo(w, h);
+    bctx.closePath();
+    bctx.fill();
+
+    // ── 枝（左から右へ斜め）──
+    const branchX0 = w*0.05, branchY0 = h*0.58;
+    const branchX1 = w*0.70, branchY1 = h*0.47;
+    bctx.save();
+    bctx.strokeStyle = 'rgba(62,58,75,0.92)';
+    bctx.lineWidth = w*0.0055;
+    bctx.lineCap = 'round';
+    bctx.beginPath();
+    bctx.moveTo(branchX0, branchY0);
+    bctx.bezierCurveTo(w*0.25, h*0.52, w*0.48, h*0.50, branchX1, branchY1);
+    bctx.stroke();
+
+    // 細い小枝たち
+    const twigs = [
+      {t:0.18, dx:-0.04, dy:-0.06, len:0.09, a:-0.6},
+      {t:0.32, dx:-0.02, dy:-0.08, len:0.07, a:-0.8},
+      {t:0.55, dx: 0.01, dy:-0.07, len:0.08, a:-0.5},
+      {t:0.72, dx: 0.03, dy:-0.09, len:0.06, a:-0.7},
+      {t:0.85, dx: 0.02, dy:-0.06, len:0.05, a:-0.4},
+      {t:0.22, dx:-0.03, dy: 0.05, len:0.06, a: 0.5},
+      {t:0.65, dx: 0.02, dy: 0.04, len:0.05, a: 0.6},
+    ];
+    bctx.lineWidth = w*0.002;
+    bctx.strokeStyle = 'rgba(58,54,70,0.78)';
+    twigs.forEach(twig=>{
+      const bx = branchX0 + (branchX1-branchX0)*twig.t;
+      const by = branchY0 + (branchY1-branchY0)*twig.t;
+      bctx.beginPath();
+      bctx.moveTo(bx, by);
+      bctx.lineTo(bx + Math.cos(twig.a)*twig.len*w, by + Math.sin(twig.a)*twig.len*h*0.5);
+      bctx.stroke();
+      // 小枝の芽
+      bctx.fillStyle = 'rgba(75,72,88,0.7)';
+      bctx.beginPath();
+      bctx.ellipse(bx + Math.cos(twig.a)*twig.len*w, by + Math.sin(twig.a)*twig.len*h*0.5, 2.5, 4, twig.a, 0, Math.PI*2);
+      bctx.fill();
+    });
+    bctx.restore();
+
+    // ── 輝く葉（風に舞う）──
+    const leafData = [
+      {bx:0.52, by:0.46, phase:0.0, speed:0.22, drift:0.018},
+      {bx:0.60, by:0.43, phase:1.3, speed:0.18, drift:0.024},
+      {bx:0.66, by:0.48, phase:2.5, speed:0.20, drift:0.015},
+      {bx:0.70, by:0.41, phase:0.8, speed:0.25, drift:0.020},
+      {bx:0.76, by:0.44, phase:3.5, speed:0.17, drift:0.022},
+      {bx:0.82, by:0.38, phase:1.8, speed:0.23, drift:0.016},
+    ];
+    leafData.forEach((ld, i)=>{
+      const age = (t*ld.speed + ld.phase) % 1.0;
+      const lx = (ld.bx + age*ld.drift*8 + Math.sin(t*0.4+i)*0.03) * w;
+      const ly = (ld.by - age*0.12 + Math.sin(t*0.5+i*0.9)*0.025) * h;
+      const lAlpha = age < 0.2 ? age/0.2 : age > 0.75 ? (1-age)/0.25 : 1;
+      const lRot = t*0.3 + ld.phase + Math.sin(t*0.35+i)*0.4;
+      const lSize = w * (0.022 + Math.sin(i*0.7)*0.006);
+
+      bctx.save();
+      bctx.translate(lx, ly);
+      bctx.rotate(lRot);
+      bctx.globalAlpha = lAlpha * 0.88;
+
+      // 葉の輝き（外側グロー）
+      const leafGlow = bctx.createRadialGradient(0, 0, 0, 0, 0, lSize*1.6);
+      leafGlow.addColorStop(0,   'rgba(210,225,245,0.45)');
+      leafGlow.addColorStop(0.5, 'rgba(180,205,235,0.18)');
+      leafGlow.addColorStop(1,   'rgba(150,185,225,0)');
+      bctx.beginPath();
+      bctx.ellipse(0, 0, lSize*1.6, lSize*1.0, 0, 0, Math.PI*2);
+      bctx.fillStyle = leafGlow;
+      bctx.fill();
+
+      // 葉本体（半透明・光る白）
+      bctx.beginPath();
+      bctx.moveTo(0, -lSize);
+      bctx.bezierCurveTo(lSize*0.7, -lSize*0.5, lSize*0.8, lSize*0.3, 0, lSize);
+      bctx.bezierCurveTo(-lSize*0.8, lSize*0.3, -lSize*0.7, -lSize*0.5, 0, -lSize);
+      bctx.fillStyle = 'rgba(215,228,248,0.72)';
+      bctx.fill();
+
+      // 葉脈
+      bctx.strokeStyle = 'rgba(240,245,255,0.5)';
+      bctx.lineWidth = 0.8;
+      bctx.beginPath();
+      bctx.moveTo(0, -lSize*0.85);
+      bctx.lineTo(0, lSize*0.85);
+      bctx.stroke();
+      [-0.45,-0.15,0.2,0.5].forEach(yf=>{
+        bctx.beginPath();
+        bctx.moveTo(0, lSize*yf);
+        bctx.lineTo(lSize*0.55, lSize*(yf+0.15));
+        bctx.moveTo(0, lSize*yf);
+        bctx.lineTo(-lSize*0.55, lSize*(yf+0.15));
+        bctx.stroke();
+      });
+
+      // 光の粒
+      bctx.globalAlpha = lAlpha * 0.7;
+      bctx.fillStyle = 'rgba(255,252,220,0.9)';
+      bctx.beginPath();
+      bctx.arc(lSize*0.15, -lSize*0.2, 1.5, 0, Math.PI*2);
+      bctx.fill();
+      bctx.restore();
+    });
+
+    // ── 小鳥本体（シマエナガ風・丸くふわふわ）──
+    const birdCX = w * 0.35;
+    const birdCY = h * 0.47 + Math.sin(t*0.45)*2.5;
+    const birdR  = Math.min(w, h) * 0.10;
+
+    // 体の影（枝に落ちる）
+    bctx.save();
+    bctx.globalAlpha = 0.18;
+    bctx.scale(1, 0.3);
+    bctx.fillStyle = 'rgba(20,20,40,0.6)';
+    bctx.beginPath();
+    bctx.ellipse(birdCX + birdR*0.1, (branchY1 + (branchY0-branchY1)*(1-0.35))/0.3 + birdR*0.5/0.3, birdR*0.6, birdR*0.3, 0, 0, Math.PI*2);
+    bctx.fill();
+    bctx.restore();
+
+    // 尾羽（長く下に）
+    bctx.save();
+    bctx.strokeStyle = 'rgba(75,78,100,0.85)';
+    bctx.lineWidth = birdR*0.12;
+    bctx.lineCap = 'round';
+    bctx.beginPath();
+    bctx.moveTo(birdCX + birdR*0.25, birdCY + birdR*0.45);
+    bctx.bezierCurveTo(birdCX + birdR*0.3, birdCY + birdR*1.1, birdCX + birdR*0.2, birdCY + birdR*1.5, birdCX + birdR*0.15, birdCY + birdR*1.9);
+    bctx.stroke();
+    bctx.restore();
+
+    // 翼のヒント（右側に半開き）
+    bctx.save();
+    bctx.globalAlpha = 0.72;
+    const wingFlap = Math.sin(t*0.3)*0.04;
+    bctx.translate(birdCX + birdR*0.5, birdCY + birdR*0.1);
+    bctx.rotate(0.18 + wingFlap);
+    bctx.fillStyle = 'rgba(195,205,230,0.55)';
+    bctx.beginPath();
+    bctx.ellipse(0, 0, birdR*0.62, birdR*0.28, -0.3, 0, Math.PI*2);
+    bctx.fill();
+    // 羽根の筋
+    bctx.strokeStyle = 'rgba(215,222,240,0.4)';
+    bctx.lineWidth = 0.8;
+    for(let wi=0;wi<4;wi++){
+      const wa = -0.3 + wi*0.18;
+      bctx.beginPath();
+      bctx.moveTo(0,0);
+      bctx.lineTo(Math.cos(wa)*birdR*0.55, Math.sin(wa)*birdR*0.24);
+      bctx.stroke();
+    }
+    bctx.restore();
+
+    // 体本体（ふわふわした丸い白い体）
+    const bodyGrad = bctx.createRadialGradient(
+      birdCX - birdR*0.18, birdCY - birdR*0.22, 0,
+      birdCX, birdCY, birdR
+    );
+    bodyGrad.addColorStop(0,   'rgba(255,255,255,0.98)');
+    bodyGrad.addColorStop(0.4, 'rgba(240,244,252,0.96)');
+    bodyGrad.addColorStop(0.75,'rgba(210,218,240,0.88)');
+    bodyGrad.addColorStop(1,   'rgba(175,188,218,0.55)');
+    bctx.beginPath();
+    bctx.arc(birdCX, birdCY, birdR, 0, Math.PI*2);
+    bctx.fillStyle = bodyGrad;
+    bctx.fill();
+
+    // 体の産毛テクスチャ（薄い線を散らす）
+    bctx.save();
+    bctx.globalAlpha = 0.12;
+    bctx.strokeStyle = 'rgba(180,190,220,1)';
+    bctx.lineWidth = 0.6;
+    for(let fi=0;fi<22;fi++){
+      const fa = fi/22*Math.PI*2;
+      const fr2 = birdR*(0.55+Math.random()*0.35);
+      bctx.beginPath();
+      bctx.moveTo(birdCX + Math.cos(fa)*fr2*0.5, birdCY + Math.sin(fa)*fr2*0.5);
+      bctx.lineTo(birdCX + Math.cos(fa+0.15)*fr2, birdCY + Math.sin(fa+0.08)*fr2);
+      bctx.stroke();
+    }
+    bctx.restore();
+
+    // 黒いアクセント（翼の縁・背中）
+    bctx.save();
+    bctx.globalAlpha = 0.55;
+    bctx.fillStyle = 'rgba(60,62,80,0.7)';
+    bctx.beginPath();
+    bctx.ellipse(birdCX + birdR*0.08, birdCY + birdR*0.38, birdR*0.45, birdR*0.16, 0.15, 0, Math.PI*2);
+    bctx.fill();
+    bctx.restore();
+
+    // 顔（頭部・少し小さめ）
+    const faceX = birdCX - birdR*0.12;
+    const faceY = birdCY - birdR*0.28;
+    const faceR = birdR*0.62;
+    const faceGrad = bctx.createRadialGradient(faceX-faceR*0.2, faceY-faceR*0.2, 0, faceX, faceY, faceR);
+    faceGrad.addColorStop(0,   'rgba(255,255,255,0.98)');
+    faceGrad.addColorStop(0.5, 'rgba(242,246,255,0.95)');
+    faceGrad.addColorStop(1,   'rgba(200,210,235,0.6)');
+    bctx.beginPath();
+    bctx.arc(faceX, faceY, faceR, 0, Math.PI*2);
+    bctx.fillStyle = faceGrad;
+    bctx.fill();
+
+    // 目（黒い丸・光のハイライト）
+    const eyeX = faceX + faceR*0.22;
+    const eyeY = faceY + faceR*0.08;
+    bctx.fillStyle = 'rgba(22,22,30,0.95)';
+    bctx.beginPath();
+    bctx.arc(eyeX, eyeY, faceR*0.13, 0, Math.PI*2);
+    bctx.fill();
+    bctx.fillStyle = 'rgba(255,255,255,0.9)';
+    bctx.beginPath();
+    bctx.arc(eyeX + faceR*0.05, eyeY - faceR*0.05, faceR*0.045, 0, Math.PI*2);
+    bctx.fill();
+
+    // くちばし
+    bctx.fillStyle = 'rgba(80,75,65,0.88)';
+    bctx.beginPath();
+    bctx.moveTo(eyeX + faceR*0.15, eyeY + faceR*0.06);
+    bctx.lineTo(eyeX + faceR*0.38, eyeY + faceR*0.12);
+    bctx.lineTo(eyeX + faceR*0.15, eyeY + faceR*0.18);
+    bctx.closePath();
+    bctx.fill();
+
+    // 足（枝を掴む）
+    const footY = birdCY + birdR * 0.88;
+    const footX = birdCX;
+    bctx.strokeStyle = 'rgba(90,85,70,0.75)';
+    bctx.lineWidth = birdR*0.045;
+    bctx.lineCap = 'round';
+    [-0.12,0.0,0.12].forEach(dx=>{
+      bctx.beginPath();
+      bctx.moveTo(footX + dx*birdR*1.5, footY);
+      bctx.lineTo(footX + dx*birdR*1.5 + dx*birdR*0.5, footY + birdR*0.18);
+      bctx.stroke();
+    });
+    // 後ろ指
+    bctx.beginPath();
+    bctx.moveTo(footX - birdR*0.08, footY);
+    bctx.lineTo(footX - birdR*0.26, footY + birdR*0.16);
+    bctx.stroke();
+
+    // ── 光のきらめき（星型）──
+    const sparklePos = [
+      [0.58,0.38],[0.65,0.44],[0.72,0.35],[0.79,0.41],[0.86,0.36],[0.68,0.30]
+    ];
+    sparklePos.forEach(([sx,sy],i)=>{
+      const sPhase = t*1.2 + i*1.1;
+      const sBright = 0.5 + 0.5*Math.sin(sPhase);
+      const sX = sx*w + Math.sin(t*0.2+i)*w*0.008;
+      const sY = sy*h + Math.cos(t*0.25+i)*h*0.012;
+      const sR = w*0.005 * sBright;
+      bctx.save();
+      bctx.globalAlpha = sBright * 0.85;
+      bctx.fillStyle = 'rgba(255,248,210,0.95)';
+      // 4角の星形
+      bctx.translate(sX, sY);
+      bctx.rotate(t*0.2+i);
+      bctx.beginPath();
+      for(let sp=0;sp<8;sp++){
+        const sAngle = sp/8*Math.PI*2;
+        const sLen = sp%2===0 ? sR : sR*0.4;
+        sp===0 ? bctx.moveTo(Math.cos(sAngle)*sLen, Math.sin(sAngle)*sLen)
+               : bctx.lineTo(Math.cos(sAngle)*sLen, Math.sin(sAngle)*sLen);
+      }
+      bctx.closePath();
+      bctx.fill();
+      bctx.restore();
+    });
+
+    // ── 最前景の草むら ──
+    bctx.fillStyle = 'rgba(8,10,22,0.94)';
+    bctx.beginPath();
+    bctx.moveTo(0, h);
+    [[0,0.93],[0.05,0.88],[0.10,0.91],[0.15,0.86],[0.20,0.90],[0.28,0.87],
+     [0.35,0.91],[0.42,0.87],[0.50,0.92],[0.58,0.88],[0.66,0.91],[0.74,0.87],
+     [0.82,0.91],[0.90,0.88],[0.96,0.92],[1.0,0.90]].forEach(([px,py])=>
+      bctx.lineTo(px*w, py*h));
+    bctx.lineTo(w, h);
+    bctx.closePath();
+    bctx.fill();
+  }
+
+  // 1単語ずつ時間差でメッセージを表示
+  function revealWords(lines, intervalMs){
+    const container = document.getElementById('word-reveal');
+    container.innerHTML = '';
+    const words = [];
+    lines.forEach((line, li)=>{
+      line.split(' ').forEach((word, wi)=>{
+        const span = document.createElement('span');
+        span.className = 'w';
+        span.textContent = word;
+        container.appendChild(span);
+        words.push(span);
+      });
+      if(li < lines.length - 1){
+        const br = document.createElement('span');
+        br.className = 'br';
+        container.appendChild(br);
+      }
+    });
+    words.forEach((span, i)=>{
+      setTimeout(()=> span.classList.add('on'), i * intervalMs);
+    });
+  }
+
+  function goBirdScene(){
+    scene = 'bird';
+    cctx.clearRect(0, 0, W, H);
+    setLine('', '');
+
+    // bird-canvas をフェードイン
+    birdCanvas.classList.add('show');
+
+    // アニメーションループ開始
+    if(birdRAF) cancelAnimationFrame(birdRAF);
+    let bStart = null;
+    function bLoop(ts){
+      if(!bStart) bStart = ts;
+      drawBirdScene((ts - bStart)/1000);
+      birdRAF = requestAnimationFrame(bLoop);
+    }
+    birdRAF = requestAnimationFrame(bLoop);
+
+    // メッセージを1単語ずつ表示（2秒後から開始）
+    setTimeout(()=>{
+      revealWords([
+        'Like a little bird,',
+        'let go of what weighs you down,',
+        'even just a little.'
+      ], 320);
+    }, 2000);
+
+    // 12秒後にフェードアウト → berries-wait へ
+    setTimeout(()=>{
+      birdCanvas.classList.remove('show');
+      const wr = document.getElementById('word-reveal');
+      wr.querySelectorAll('.w').forEach(s=>{ s.classList.remove('on'); });
+      setTimeout(()=>{
+        if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
+        bctx.clearRect(0, 0, W, H);
+        wr.innerHTML = '';
+        tapHint.classList.add('show');
+        scene = 'berries-wait';
+      }, 2500);
+    }, 14000);
   }
 
   function goRelease(){
@@ -1253,7 +1728,13 @@
     if(scene==='intro') goPrompt();
     else if(scene==='berries-wait') goRelease();
     else if(scene==='hidden-offer') revealHiddenScene();
-    else if(scene==='hidden' || scene==='end') goIntro();
+    else if(scene==='end') goIntro();
+  });
+
+  // ハイランドシーン画面：タップで最初に戻る
+  hiddenScene.addEventListener('click', (e)=>{
+    if(e.target.closest('#sound-toggle')) return; // 音楽ボタンは除外
+    if(scene==='hidden') goIntro();
   });
 
   // 起動
