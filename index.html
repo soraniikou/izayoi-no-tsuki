@@ -153,29 +153,35 @@
   }
   #submit-word:hover{ color: var(--ink); }
 
-  #tap-hint{
+  #back-btn{
     position:absolute; bottom:5vh; left:50%; transform:translateX(-50%);
     font-family:'Zen Kaku Gothic New', sans-serif;
     font-weight:300;
-    font-size: 11px;
-    letter-spacing:0.1em;
-    color: rgba(200,205,225,0.9);
+    font-size: 13px;
+    letter-spacing:0.18em;
+    color: rgba(200,205,225,0.88);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(200,205,225,0.25);
+    border-radius: 20px;
+    padding: 7px 22px;
+    cursor: pointer;
     opacity:0;
-    transition: opacity 2s ease;
+    transition: opacity 2s ease, background 0.3s ease;
     z-index:6;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #back-btn.show{
+    opacity:1;
+    pointer-events: auto;
     animation: pulse 3.5s ease-in-out infinite;
   }
-  #tap-hint.show{ opacity:1; }
+  #back-btn:hover{ background: rgba(255,255,255,0.14); }
   @keyframes pulse{
     0%,100%{ opacity:0.7; } 50%{ opacity:1; }
   }
 
-  #privacy{
-    position:absolute; top:3vh; left:50%; transform:translateX(-50%);
-    font-size:10px; letter-spacing:0.05em; color: rgba(124,130,153,0.4);
-    text-align:center; max-width:80vw; z-index:6;
-    font-family:'Zen Kaku Gothic New', sans-serif; font-weight:300;
-  }
+  #privacy{ display:none; }
 
   #floating-word{
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
@@ -283,7 +289,7 @@
       <button id="submit-word"></button>
     </div>
   </div>
-  <div id="tap-hint">Touch the screen to continue</div>
+  <button id="back-btn">← Back</button>
 
   <div id="hidden-scene">
     <canvas id="highland-canvas"></canvas>
@@ -427,7 +433,8 @@
   const inputRow = document.getElementById('input-row');
   const wordInput = document.getElementById('word-input');
   const submitWord = document.getElementById('submit-word');
-  const tapHint = document.getElementById('tap-hint');
+  const backBtn = document.getElementById('back-btn');
+  backBtn.addEventListener('click', ()=>{ if(backBtn.classList.contains('show')) goIntro(); });
   const moonEl = document.getElementById('moon');
   const floatingWord = document.getElementById('floating-word');
   const stage = document.getElementById('stage');
@@ -457,7 +464,7 @@
   function goIntro(){
     scene='intro';
     hideChoices();
-    tapHint.classList.remove('show');
+    backBtn.classList.remove('show');
     hiddenScene.classList.remove('show');
     if(highlandRAF){ cancelAnimationFrame(highlandRAF); highlandRAF=null; hctx.clearRect(0,0,window.innerWidth,window.innerHeight); }
     if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
@@ -472,13 +479,13 @@
     setLine('', '');
     setTimeout(()=>{
       setLine('Buck Moon.', '');
-      setTimeout(()=> tapHint.classList.add('show'), 2600);
+      setTimeout(()=> backBtn.classList.add('show'), 2600);
     }, 600);
   }
 
   function goPrompt(){
     scene='prompt';
-    tapHint.classList.remove('show');
+    backBtn.classList.remove('show');
     setLine('Is there something you\u2019d like to let go of?', '');
     setTimeout(()=>{
       choiceRow.classList.add('show');
@@ -528,7 +535,7 @@
   function goBerries(){
     scene='berries';
     hideChoices();
-    tapHint.classList.remove('show');
+    backBtn.classList.remove('show');
     cctx.clearRect(0,0,W,H);
     particles = [];
     moonEl.classList.remove('lit');
@@ -773,7 +780,7 @@
 
   function moonToClover(){
     scene = 'moon-transform';
-    tapHint.classList.remove('show');
+    backBtn.classList.remove('show');
 
     const mr = moonRect();
     const cx = mr.left + mr.width / 2;
@@ -1587,7 +1594,7 @@
       setTimeout(()=>{
         if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
         bctx.clearRect(0, 0, W, H);
-        tapHint.classList.add('show');
+        backBtn.classList.add('show');
         scene = 'berries-wait';
       }, 2500);
     }, 34000);
@@ -1595,7 +1602,7 @@
 
   function goRelease(){
     scene='release';
-    tapHint.classList.remove('show');
+    backBtn.classList.remove('show');
     moonEl.classList.add('lit');
     setLine('Letting it all go, gently.', 'A release of love');
     const mr = moonRect();
@@ -1633,7 +1640,7 @@
       if(isFullMoonNight()){
         offerHiddenScene();
       } else {
-        tapHint.classList.add('show');
+        backBtn.classList.add('show');
         scene='end';
       }
     }, 3200);
@@ -1944,12 +1951,12 @@
   function offerHiddenScene(){
     scene='hidden-offer';
     setLine('A somewhat special night.', 'Would you like to gently touch it?');
-    tapHint.classList.add('show');
+    backBtn.classList.add('show');
   }
 
   function revealHiddenScene(){
     scene='hidden';
-    tapHint.classList.remove('show');
+    backBtn.classList.remove('show');
     setLine('', '');
     hiddenScene.classList.add('show');
     // ハイランドシーンのアニメーションループ開始
@@ -2011,7 +2018,7 @@
       bctx.clearRect(0,0,W,H);
       const _wr2 = document.getElementById('word-reveal');
       if(_wr2) _wr2.innerHTML = '';
-      setTimeout(()=>{ tapHint.classList.add('show'); scene='berries-wait'; }, 600);
+      setTimeout(()=>{ backBtn.classList.add('show'); scene='berries-wait'; }, 600);
     }
     else if(scene==='hidden-offer') revealHiddenScene();
     else if(scene==='end') goIntro();
