@@ -687,26 +687,6 @@
     ctx.fillStyle = glow;
     ctx.fill();
 
-    // がく（sepal）：尖った緑の三角形を花底に並べる
-    const SEPAL = 10;
-    for(let s = 0; s < SEPAL; s++){
-      const sa = (s / SEPAL) * Math.PI * 2 + 0.15;
-      const sx = fx + Math.cos(sa) * fr * 0.5;
-      const sy = fy + fr * 0.36 + Math.sin(sa) * fr * 0.22;
-      const tipSx = fx + Math.cos(sa) * fr * 0.85;
-      const tipSy = sy + fr * 0.38;
-      ctx.save();
-      ctx.globalAlpha = alpha * 0.88;
-      ctx.fillStyle = `rgba(85,138,58,1)`;
-      ctx.beginPath();
-      ctx.moveTo(sx - fr*0.06, sy);
-      ctx.lineTo(tipSx, tipSy);
-      ctx.lineTo(sx + fr*0.06, sy);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
     // 花托（緑のドーム底部）
     const recGrad = ctx.createRadialGradient(fx, fy + fr*0.22, 0, fx, fy + fr*0.1, fr*0.58);
     recGrad.addColorStop(0, `rgba(110,158,72,${alpha*0.92})`);
@@ -750,32 +730,32 @@
   function drawCloverShape(ctx, cx, cy, r, alpha){
     ctx.save();
 
-    // --- 茎（太め、やや湾曲）---
-    const stemBot = { x: cx + r*0.05, y: cy + r*1.35 };
+    // --- 茎（細め・長め、やや湾曲）---
+    const stemBot = { x: cx + r*0.05, y: cy + r*2.70 }; // 長さ2倍
     const stemTop = { x: cx,          y: cy + r*0.3  };
     ctx.strokeStyle = `rgba(105,158,78,${alpha*0.82})`;
-    ctx.lineWidth   = r * 0.11;
+    ctx.lineWidth   = r * 0.066; // 太さ0.6倍
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(stemBot.x, stemBot.y);
     ctx.bezierCurveTo(
-      stemBot.x + r*0.1, stemBot.y - r*0.5,
-      stemTop.x - r*0.05, stemTop.y + r*0.4,
+      stemBot.x + r*0.12, stemBot.y - r*1.0,
+      stemTop.x - r*0.06, stemTop.y + r*0.8,
       stemTop.x, stemTop.y
     );
     ctx.stroke();
 
     // 茎の産毛（細い短線を散らす）
     ctx.strokeStyle = `rgba(140,190,105,${alpha*0.22})`;
-    ctx.lineWidth = r * 0.025;
-    for(let i = 0; i < 10; i++){
-      const tt = i / 10;
+    ctx.lineWidth = r * 0.018;
+    for(let i = 0; i < 14; i++){
+      const tt = i / 14;
       const hx = cx + (stemBot.x - cx) * (1 - tt);
       const hy = cy + r*0.3 + (stemBot.y - cy - r*0.3) * (1 - tt);
       const side = (i % 2 === 0 ? 1 : -1);
       ctx.beginPath();
       ctx.moveTo(hx, hy);
-      ctx.lineTo(hx + side * r*0.08, hy - r*0.04);
+      ctx.lineTo(hx + side * r*0.07, hy - r*0.035);
       ctx.stroke();
     }
 
