@@ -40,6 +40,13 @@
     width: 34vmin; height:34vmin;
     z-index:2;
   }
+  /* スマホ（縦持ち）：月が画面上部で切れないよう下に移動 */
+  @media (max-width: 600px) and (orientation: portrait),
+         (max-height: 700px) and (orientation: portrait) {
+    #moon-wrap{
+      top: 36%;
+    }
+  }
   #moon-glow{
     position:absolute; inset:-40%;
     border-radius:50%;
