@@ -257,6 +257,10 @@
     letter-spacing: 0.04em;
     pointer-events:none; z-index:6;
   }
+  /* 鳥シーン中のみ0.7倍に縮小 */
+  #word-reveal.bird-size{
+    font-size: clamp(21px, 3.08vmin, 28px);
+  }
   #word-reveal .w{
     display:inline-block;
     opacity:0;
@@ -475,6 +479,7 @@
     hideChoices();
     backBtn.classList.remove('show');
     hiddenScene.classList.remove('show');
+    document.getElementById('word-reveal').classList.remove('bird-size');
     if(highlandRAF){ cancelAnimationFrame(highlandRAF); highlandRAF=null; hctx.clearRect(0,0,window.innerWidth,window.innerHeight); }
     if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
     birdCanvas.classList.remove('show');
@@ -1249,12 +1254,14 @@
       const mox = w*0.82, moy = h*0.22, mr = w*0.048;
       bctx.save();
       bctx.globalAlpha = moonA;
+      // 月本体（完全な円）
       bctx.beginPath();
-      bctx.arc(mox, moy, mr, -0.35, Math.PI+0.35);
+      bctx.arc(mox, moy, mr, 0, Math.PI*2);
       bctx.fillStyle = 'rgba(235,235,210,0.92)';
       bctx.fill();
+      // 影（完全な円で三日月形を作る）
       bctx.beginPath();
-      bctx.arc(mox + mr*0.38, moy - mr*0.08, mr*0.84, -0.55, Math.PI+0.55);
+      bctx.arc(mox + mr*0.38, moy - mr*0.08, mr*0.84, 0, Math.PI*2);
       bctx.fillStyle = 'rgba(14,20,48,0.98)';
       bctx.fill();
       bctx.restore();
@@ -1440,6 +1447,24 @@
         bctx.fillStyle = `rgba(220,235,255,${milkyWayT * twinkle})`;
         bctx.fill();
       });
+
+      // カシオペア座の下にテキスト
+      const cassMaxY = Math.max(...cassStars.map(s => s.ry)) * h;
+      const cassMinX = Math.min(...cassStars.map(s => s.rx)) * w;
+      const cassMaxX = Math.max(...cassStars.map(s => s.rx)) * w;
+      const cassMidX = (cassMinX + cassMaxX) / 2;
+      const textY    = cassMaxY + h * 0.06;
+      const fontSize = Math.max(11, Math.min(w, h) * 0.022);
+      bctx.save();
+      bctx.font = `300 ${fontSize}px 'Zen Kaku Gothic New', sans-serif`;
+      bctx.letterSpacing = '0.12em';
+      bctx.textAlign = 'center';
+      bctx.fillStyle = `rgba(180,210,255,${milkyWayT * 0.88})`;
+      bctx.shadowColor = 'rgba(100,160,255,0.6)';
+      bctx.shadowBlur  = 12;
+      bctx.fillText('Destruction and Rebirth', cassMidX, textY);
+      bctx.restore();
+
       bctx.restore();
     }
 
@@ -1694,6 +1719,7 @@
     cctx.clearRect(0, 0, W, H);
     setLine('', '');
     backBtn.classList.add('show');
+    document.getElementById('word-reveal').classList.add('bird-size');
 
     // bird-canvas をフェードイン
     birdCanvas.classList.add('show');
