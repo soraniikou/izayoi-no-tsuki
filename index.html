@@ -1175,9 +1175,12 @@
     // morphT: 0=シマエナガ 1=鷹（フェーズBで0→1）
     const morphT = inA ? 0 : inB ? Math.min((t - PHASE_A_END)/(PHASE_B_END - PHASE_A_END), 1) : 1;
 
-    // 夜明け進行度（フェーズBから明けていく）
-    const dawnT = inA ? 0 : inB ? Math.min((t - PHASE_A_END)/4, 1)*0.3
-                             : Math.min((t - PHASE_B_END)/(PHASE_C_END - PHASE_B_END), 1);
+    // 夜明け進行度（フェーズBから明けていく・天の川フェーズで深夜に戻る）
+    const dawnRaw = inA ? 0 : inB ? Math.min((t - PHASE_A_END)/4, 1)*0.3
+                              : Math.min((t - PHASE_B_END)/(PHASE_C_END - PHASE_B_END), 1);
+    // ct>=6 から 4秒かけて夜明け色を消し夜空へ（天の川のために）
+    const mwFade = inC ? Math.min(Math.max((t - PHASE_B_END - 6) / 4, 0), 1) : 0;
+    const dawnT  = dawnRaw * (1 - mwFade);
 
     // ── 背景：深夜→夜明け ──
     const sky = bctx.createLinearGradient(0, 0, 0, h);
@@ -1243,7 +1246,7 @@
     // ── 三日月（夜明けとともに薄れる）──
     if(dawnT < 0.8){
       const moonA = Math.max(0, 1 - dawnT/0.8);
-      const mox = w*0.82, moy = h*0.12, mr = w*0.048;
+      const mox = w*0.82, moy = h*0.22, mr = w*0.048;
       bctx.save();
       bctx.globalAlpha = moonA;
       bctx.beginPath();
@@ -1257,48 +1260,188 @@
       bctx.restore();
     }
 
+    // フェーズC内で天の川への移行進行度（ct>=6 から 4秒かけてフェード）
+    const ct0 = inC ? (t - PHASE_B_END) : 0;
+    const milkyWayT = inC ? Math.min(Math.max((ct0 - 6) / 4, 0), 1) : 0;
+    // 山のフェードアウト（ct>=6 から消える）
+    const hillAlpha = 1 - milkyWayT;
+
     // ── 遠景の丘（なだらかな緑の山並み・3層）──
-    // 最遠景（薄い青緑）
-    const hillFar = lerpC([30,35,62],[28,72,48],dawnT*0.85);
-    bctx.fillStyle = `rgba(${hillFar.join(',')},0.72)`;
-    bctx.beginPath();
-    bctx.moveTo(0, h);
-    bctx.lineTo(0, h*0.72);
-    bctx.bezierCurveTo(w*0.12, h*0.62, w*0.22, h*0.66, w*0.32, h*0.64);
-    bctx.bezierCurveTo(w*0.42, h*0.62, w*0.50, h*0.58, w*0.60, h*0.61);
-    bctx.bezierCurveTo(w*0.70, h*0.64, w*0.80, h*0.60, w*0.90, h*0.63);
-    bctx.bezierCurveTo(w*0.96, h*0.65, w*1.0,  h*0.67, w*1.0,  h*0.67);
-    bctx.lineTo(w, h);
-    bctx.closePath();
-    bctx.fill();
+    if(hillAlpha > 0.01){
+      // 最遠景（薄い青緑）
+      const hillFar = lerpC([30,35,62],[28,72,48],dawnT*0.85);
+      bctx.fillStyle = `rgba(${hillFar.join(',')},${0.72*hillAlpha})`;
+      bctx.beginPath();
+      bctx.moveTo(0, h);
+      bctx.lineTo(0, h*0.72);
+      bctx.bezierCurveTo(w*0.12, h*0.62, w*0.22, h*0.66, w*0.32, h*0.64);
+      bctx.bezierCurveTo(w*0.42, h*0.62, w*0.50, h*0.58, w*0.60, h*0.61);
+      bctx.bezierCurveTo(w*0.70, h*0.64, w*0.80, h*0.60, w*0.90, h*0.63);
+      bctx.bezierCurveTo(w*0.96, h*0.65, w*1.0,  h*0.67, w*1.0,  h*0.67);
+      bctx.lineTo(w, h);
+      bctx.closePath();
+      bctx.fill();
 
-    // 中景（深い緑）
-    const hillMid = lerpC([22,32,50],[20,62,35],dawnT*0.85);
-    bctx.fillStyle = `rgba(${hillMid.join(',')},0.85)`;
-    bctx.beginPath();
-    bctx.moveTo(0, h);
-    bctx.lineTo(0, h*0.80);
-    bctx.bezierCurveTo(w*0.10, h*0.72, w*0.20, h*0.75, w*0.30, h*0.71);
-    bctx.bezierCurveTo(w*0.40, h*0.68, w*0.50, h*0.73, w*0.60, h*0.70);
-    bctx.bezierCurveTo(w*0.72, h*0.67, w*0.82, h*0.71, w*0.92, h*0.69);
-    bctx.bezierCurveTo(w*0.97, h*0.68, w*1.0,  h*0.72, w*1.0,  h*0.72);
-    bctx.lineTo(w, h);
-    bctx.closePath();
-    bctx.fill();
+      // 中景（深い緑）
+      const hillMid = lerpC([22,32,50],[20,62,35],dawnT*0.85);
+      bctx.fillStyle = `rgba(${hillMid.join(',')},${0.85*hillAlpha})`;
+      bctx.beginPath();
+      bctx.moveTo(0, h);
+      bctx.lineTo(0, h*0.80);
+      bctx.bezierCurveTo(w*0.10, h*0.72, w*0.20, h*0.75, w*0.30, h*0.71);
+      bctx.bezierCurveTo(w*0.40, h*0.68, w*0.50, h*0.73, w*0.60, h*0.70);
+      bctx.bezierCurveTo(w*0.72, h*0.67, w*0.82, h*0.71, w*0.92, h*0.69);
+      bctx.bezierCurveTo(w*0.97, h*0.68, w*1.0,  h*0.72, w*1.0,  h*0.72);
+      bctx.lineTo(w, h);
+      bctx.closePath();
+      bctx.fill();
 
-    // 前景（最も濃い緑）
-    const hillNear = lerpC([15,22,40],[14,50,28],dawnT*0.85);
-    bctx.fillStyle = `rgba(${hillNear.join(',')},0.94)`;
-    bctx.beginPath();
-    bctx.moveTo(0, h);
-    bctx.lineTo(0, h*0.88);
-    bctx.bezierCurveTo(w*0.08, h*0.82, w*0.18, h*0.84, w*0.28, h*0.80);
-    bctx.bezierCurveTo(w*0.38, h*0.77, w*0.48, h*0.81, w*0.58, h*0.78);
-    bctx.bezierCurveTo(w*0.70, h*0.75, w*0.80, h*0.79, w*0.90, h*0.76);
-    bctx.bezierCurveTo(w*0.96, h*0.74, w*1.0,  h*0.77, w*1.0,  h*0.77);
-    bctx.lineTo(w, h);
-    bctx.closePath();
-    bctx.fill();
+      // 前景（最も濃い緑）
+      const hillNear = lerpC([15,22,40],[14,50,28],dawnT*0.85);
+      bctx.fillStyle = `rgba(${hillNear.join(',')},${0.94*hillAlpha})`;
+      bctx.beginPath();
+      bctx.moveTo(0, h);
+      bctx.lineTo(0, h*0.88);
+      bctx.bezierCurveTo(w*0.08, h*0.82, w*0.18, h*0.84, w*0.28, h*0.80);
+      bctx.bezierCurveTo(w*0.38, h*0.77, w*0.48, h*0.81, w*0.58, h*0.78);
+      bctx.bezierCurveTo(w*0.70, h*0.75, w*0.80, h*0.79, w*0.90, h*0.76);
+      bctx.bezierCurveTo(w*0.96, h*0.74, w*1.0,  h*0.77, w*1.0,  h*0.77);
+      bctx.lineTo(w, h);
+      bctx.closePath();
+      bctx.fill();
+    }
+
+    // ── 天の川（milkyWayT > 0 で出現）──
+    if(milkyWayT > 0){
+      bctx.save();
+
+      // 天の川の帯（斜めに走る青白い光の帯）
+      const mwAngle = -Math.PI * 0.28; // 斜め角度
+      const mwCX = w * 0.5, mwCY = h * 0.42;
+      const mwLen = Math.max(w, h) * 1.6;
+      const mwW   = w * 0.55;
+
+      // 帯の中心軸
+      const mwDx = Math.cos(mwAngle), mwDy = Math.sin(mwAngle);
+      const perpX = -mwDy, perpY = mwDx;
+
+      // グロー1（外側・柔らかい）
+      const mwGrad1 = bctx.createLinearGradient(
+        mwCX - perpX*mwW, mwCY - perpY*mwW,
+        mwCX + perpX*mwW, mwCY + perpY*mwW
+      );
+      mwGrad1.addColorStop(0,   'rgba(20,40,100,0)');
+      mwGrad1.addColorStop(0.3, `rgba(60,110,200,${milkyWayT*0.12})`);
+      mwGrad1.addColorStop(0.5, `rgba(140,185,255,${milkyWayT*0.22})`);
+      mwGrad1.addColorStop(0.7, `rgba(60,110,200,${milkyWayT*0.12})`);
+      mwGrad1.addColorStop(1,   'rgba(20,40,100,0)');
+
+      bctx.save();
+      bctx.translate(mwCX, mwCY);
+      bctx.rotate(mwAngle);
+      bctx.fillStyle = mwGrad1;
+      bctx.fillRect(-mwLen/2, -mwW, mwLen, mwW*2);
+      bctx.restore();
+
+      // グロー2（コア：より明るい細い帯）
+      const mwGrad2 = bctx.createLinearGradient(
+        mwCX - perpX*mwW*0.4, mwCY - perpY*mwW*0.4,
+        mwCX + perpX*mwW*0.4, mwCY + perpY*mwW*0.4
+      );
+      mwGrad2.addColorStop(0,   'rgba(100,150,255,0)');
+      mwGrad2.addColorStop(0.35,`rgba(160,200,255,${milkyWayT*0.18})`);
+      mwGrad2.addColorStop(0.5, `rgba(210,230,255,${milkyWayT*0.35})`);
+      mwGrad2.addColorStop(0.65,`rgba(160,200,255,${milkyWayT*0.18})`);
+      mwGrad2.addColorStop(1,   'rgba(100,150,255,0)');
+
+      bctx.save();
+      bctx.translate(mwCX, mwCY);
+      bctx.rotate(mwAngle);
+      bctx.fillStyle = mwGrad2;
+      bctx.fillRect(-mwLen/2, -mwW*0.4, mwLen, mwW*0.8);
+      bctx.restore();
+
+      // 天の川の星粒（無数の小さな輝き）
+      const mwStars = [
+        [0.08,0.18],[0.15,0.28],[0.22,0.35],[0.30,0.30],[0.38,0.22],
+        [0.45,0.38],[0.52,0.44],[0.58,0.36],[0.65,0.28],[0.72,0.42],
+        [0.78,0.34],[0.85,0.24],[0.92,0.40],[0.12,0.45],[0.25,0.52],
+        [0.34,0.48],[0.42,0.55],[0.50,0.50],[0.60,0.46],[0.70,0.52],
+        [0.80,0.48],[0.88,0.38],[0.18,0.55],[0.28,0.62],[0.48,0.60],
+        [0.62,0.58],[0.75,0.62],[0.20,0.12],[0.40,0.15],[0.60,0.10],
+        [0.82,0.18],[0.35,0.08],[0.55,0.20],[0.68,0.16],[0.90,0.25],
+      ];
+      mwStars.forEach(([sx, sy], si)=>{
+        const twinkle = 0.5 + 0.5 * Math.sin(t * 1.8 + si * 2.3);
+        const r = 0.5 + Math.random() * 1.0;
+        bctx.beginPath();
+        bctx.arc(sx*w, sy*h, r * (0.6 + twinkle*0.8), 0, Math.PI*2);
+        const brightness = 180 + Math.floor(twinkle * 75);
+        bctx.fillStyle = `rgba(${brightness},${brightness + 30},255,${milkyWayT * twinkle * 0.9})`;
+        bctx.fill();
+      });
+
+      // 鷹を包む青い光の輪（中央付近にゆらぐグロー）
+      const embraceGlow = bctx.createRadialGradient(
+        w*0.5, h*0.48, 0,
+        w*0.5, h*0.48, w*0.38
+      );
+      embraceGlow.addColorStop(0,   `rgba(120,170,255,${milkyWayT*0.18})`);
+      embraceGlow.addColorStop(0.4, `rgba(80,130,240,${milkyWayT*0.10})`);
+      embraceGlow.addColorStop(0.8, `rgba(40,80,200,${milkyWayT*0.04})`);
+      embraceGlow.addColorStop(1,   'rgba(20,50,160,0)');
+      bctx.fillStyle = embraceGlow;
+      bctx.fillRect(0, 0, w, h);
+
+      bctx.restore();
+    }
+
+    // ── カシオペア座（milkyWayT > 0 で出現）──
+    if(milkyWayT > 0){
+      // カシオペア座のW字（5つの星）中心(0.32, 0.125)を基準に1.8倍拡大
+      const cassCX = 0.32, cassCY = 0.125;
+      const cassScale = 1.8;
+      const cassStars = [
+        {rx:0.12, ry:0.14},
+        {rx:0.22, ry:0.08},
+        {rx:0.32, ry:0.15},
+        {rx:0.42, ry:0.09},
+        {rx:0.52, ry:0.17},
+      ].map(s=>({
+        rx: cassCX + (s.rx - cassCX) * cassScale,
+        ry: cassCY + (s.ry - cassCY) * cassScale,
+      }));
+      bctx.save();
+      // 結ぶ線
+      bctx.beginPath();
+      cassStars.forEach((s, i)=>{
+        if(i === 0) bctx.moveTo(s.rx*w, s.ry*h);
+        else        bctx.lineTo(s.rx*w, s.ry*h);
+      });
+      bctx.strokeStyle = `rgba(160,200,255,${milkyWayT*0.4})`;
+      bctx.lineWidth = 1.2;
+      bctx.stroke();
+      // 各星（サイズも1.8倍）
+      cassStars.forEach((s, si)=>{
+        const twinkle = 0.6 + 0.4 * Math.sin(t*1.2 + si*1.8);
+        const starR = ((si===1||si===3) ? 2.4 : 1.8) * 1.8; // 1.8倍
+        // 輝きグロー
+        const sg = bctx.createRadialGradient(s.rx*w, s.ry*h, 0, s.rx*w, s.ry*h, starR*4);
+        sg.addColorStop(0,   `rgba(200,220,255,${milkyWayT*twinkle*0.9})`);
+        sg.addColorStop(0.4, `rgba(140,180,255,${milkyWayT*twinkle*0.4})`);
+        sg.addColorStop(1,   'rgba(80,120,220,0)');
+        bctx.beginPath();
+        bctx.arc(s.rx*w, s.ry*h, starR*4, 0, Math.PI*2);
+        bctx.fillStyle = sg;
+        bctx.fill();
+        // 星本体
+        bctx.beginPath();
+        bctx.arc(s.rx*w, s.ry*h, starR * twinkle, 0, Math.PI*2);
+        bctx.fillStyle = `rgba(220,235,255,${milkyWayT * twinkle})`;
+        bctx.fill();
+      });
+      bctx.restore();
+    }
 
     // 湖面の反射（夜明けは橙〜赤）
     const refX = w*0.62, refY = h*0.82;
