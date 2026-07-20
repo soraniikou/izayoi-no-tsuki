@@ -1478,14 +1478,25 @@
       bctx.restore();
     }
 
-    // ── カシオペア座（milkyWayT > 0 で出現・鷹が消えた後に中央へ移動）──
+    // ── カシオペア座（milkyWayT > 0 で出現・天の川安定後に中央へ移動）──
     if(milkyWayT > 0){
-      // ct0=14〜18s で中心X: 0.58（右）→ 0.50（中央）へ easeInOut 補間
-      const cassMoveT = Math.min(Math.max((ct0 - 14) / 4, 0), 1);
+      // milkyWayT が 1 に到達するのは ct0=10s
+      // その直後 ct0=10〜14s で中心X: 0.58（右）→ 0.50（中央）へ easeInOut 補間
+      const cassMoveT = Math.min(Math.max((ct0 - 10) / 4, 0), 1);
       const easedMove = cassMoveT < 0.5
         ? 2 * cassMoveT * cassMoveT
         : 1 - Math.pow(-2 * cassMoveT + 2, 2) / 2;
       const cassCX = 0.58 - easedMove * 0.08; // 0.58 → 0.50
+
+      // ── デバッグ：1秒おきに値を出力 ──
+      if(Math.floor(t) !== Math.floor(t - 1/60) && ct0 >= 9){
+        const _dbgStars = [{rx:0.12,ry:0.14},{rx:0.22,ry:0.08},{rx:0.32,ry:0.15},{rx:0.42,ry:0.09},{rx:0.52,ry:0.17}]
+          .map(s=>({ rx: cassCX+(s.rx-cassCX)*1.8, ry: 0.18+(s.ry-0.18)*2.4 }));
+        const _maxY = Math.max(..._dbgStars.map(s=>s.ry))*H;
+        const _minX = Math.min(..._dbgStars.map(s=>s.rx))*W;
+        const _maxX = Math.max(..._dbgStars.map(s=>s.rx))*W;
+        console.log(`[cass] t=${t.toFixed(1)} ct0=${ct0.toFixed(1)} cassMoveT=${cassMoveT.toFixed(3)} easedMove=${easedMove.toFixed(3)} cassCX=${cassCX.toFixed(3)} cassMidX=${((_minX+_maxX)/2).toFixed(0)}px textY=${(_maxY+H*0.06).toFixed(0)}px`);
+      }
       const cassCY = 0.18;
       const cassScaleX = 1.8, cassScaleY = 2.4;
       const cassStars = [
@@ -1545,10 +1556,10 @@
 
       bctx.restore();
 
-      // ct0=18s 以降：wish入力欄をフェードイン表示（cassMidX/cassMaxYをDOMに反映）
+      // ct0=14s 以降（移動完了後）：wish入力欄をフェードイン表示
       const wishWrap = document.getElementById('wish-input-wrap');
-      if(ct0 >= 18){
-        const wishAlpha = Math.min((ct0 - 18) / 2, 1);
+      if(ct0 >= 14){
+        const wishAlpha = Math.min((ct0 - 14) / 2, 1);
         wishWrap.style.opacity = wishAlpha;
         wishWrap.style.pointerEvents = wishAlpha > 0.5 ? 'auto' : 'none';
         // 入力欄をカシオペア座の下・"Destruction and Rebirth" テキストのさらに下に配置
