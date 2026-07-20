@@ -888,7 +888,7 @@
         requestAnimationFrame(animFrame);
       } else {
         // 変化完了 → しばらく表示してからタップ待ちへ
-        setLine('Something gentle, blooming here.', '');
+        setLine('', '');
         setTimeout(()=>{
           // クローバーをゆっくりフェードアウト
           let fadeT = 0;
@@ -1440,7 +1440,7 @@
     // ── カシオペア座（milkyWayT > 0 で出現）──
     if(milkyWayT > 0){
       // カシオペア座のW字：右寄せ・縦長（X1.8倍・Y2.4倍）
-      const cassCX = 0.40, cassCY = 0.125;
+      const cassCX = 0.58, cassCY = 0.125;
       const cassScaleX = 1.8, cassScaleY = 2.4;
       const cassStars = [
         {rx:0.12, ry:0.14},
