@@ -924,6 +924,7 @@
 
   // ---------- 小鳥シーン ----------
   let birdRAF = null;
+  let birdSceneStart = null; // 鳥シーン開始タイムスタンプ（天の川フェーズ判定用）
 
   // ── ヘルパー：色を線形補間 ──
   function lerpC(a, b, t){
@@ -1438,9 +1439,9 @@
 
     // ── カシオペア座（milkyWayT > 0 で出現）──
     if(milkyWayT > 0){
-      // カシオペア座のW字（5つの星）中心(0.32, 0.125)を基準に1.8倍拡大
-      const cassCX = 0.32, cassCY = 0.125;
-      const cassScale = 1.8;
+      // カシオペア座のW字：右寄せ・縦長（X1.8倍・Y2.4倍）
+      const cassCX = 0.40, cassCY = 0.125;
+      const cassScaleX = 1.8, cassScaleY = 2.4;
       const cassStars = [
         {rx:0.12, ry:0.14},
         {rx:0.22, ry:0.08},
@@ -1448,8 +1449,8 @@
         {rx:0.42, ry:0.09},
         {rx:0.52, ry:0.17},
       ].map(s=>({
-        rx: cassCX + (s.rx - cassCX) * cassScale,
-        ry: cassCY + (s.ry - cassCY) * cassScale,
+        rx: cassCX + (s.rx - cassCX) * cassScaleX,
+        ry: cassCY + (s.ry - cassCY) * cassScaleY,
       }));
       bctx.save();
       // 結ぶ線
@@ -1759,10 +1760,10 @@
 
     // アニメーションループ開始
     if(birdRAF) cancelAnimationFrame(birdRAF);
-    let bStart = null;
+    birdSceneStart = null;
     function bLoop(ts){
-      if(!bStart) bStart = ts;
-      drawBirdScene((ts - bStart)/1000);
+      if(!birdSceneStart) birdSceneStart = ts;
+      drawBirdScene((ts - birdSceneStart)/1000);
       birdRAF = requestAnimationFrame(bLoop);
     }
     birdRAF = requestAnimationFrame(bLoop);
@@ -1800,16 +1801,7 @@
       setTimeout(()=>{ wr.innerHTML = ''; }, 1200);
     }, 30000);
 
-    // 34秒後にフェードアウト → berries-wait へ
-    setTimeout(()=>{
-      birdCanvas.classList.remove('show');
-      setTimeout(()=>{
-        if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
-        bctx.clearRect(0, 0, W, H);
-        backBtn.classList.add('show');
-        scene = 'berries-wait';
-      }, 2500);
-    }, 34000);
+    // 自動遷移なし：Back ボタンを押すまで最終画面に留まる
   }
 
   function goRelease(){
@@ -2224,7 +2216,10 @@
     else if(scene==='prompt') goBerries();
     else if(scene==='berries-wait') goRelease();
     else if(scene==='bird'){
-      // 小鳥シーン中タップでスキップ
+      // 天の川フェーズ（20秒以降）はタップスキップ不可・Back ボタンのみで戻る
+      const birdElapsed = birdSceneStart ? (performance.now() - birdSceneStart) / 1000 : 0;
+      if(birdElapsed >= 20) return;
+      // 小鳥〜鷹フェーズ中はタップでスキップ可
       if(birdRAF){ cancelAnimationFrame(birdRAF); birdRAF=null; }
       birdCanvas.classList.remove('show');
       bctx.clearRect(0,0,W,H);
