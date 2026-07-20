@@ -256,6 +256,40 @@
   }
   #sound-toggle:hover{ border-color: rgba(217,220,232,0.7); }
 
+  /* ---------- 願い事入力欄（天の川フェーズ） ---------- */
+  #wish-input-wrap{
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 12;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0s; /* JS側で直接制御 */
+    text-align: center;
+  }
+  #wish-input{
+    background: rgba(10,15,40,0.55);
+    border: 1px solid rgba(160,200,255,0.45);
+    border-radius: 24px;
+    color: rgba(210,230,255,0.95);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-weight: 300;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    padding: 9px 22px;
+    width: clamp(220px, 46vw, 380px);
+    outline: none;
+    text-align: center;
+    caret-color: rgba(160,200,255,0.9);
+  }
+  #wish-input::placeholder{
+    color: rgba(140,180,255,0.5);
+    letter-spacing: 0.10em;
+  }
+  #wish-input:focus{
+    border-color: rgba(180,215,255,0.75);
+    background: rgba(10,15,45,0.7);
+  }
+
   /* ---------- 月→クローバー変化オーバーレイ ---------- */
   #clover-canvas{
     position:absolute; inset:0; width:100%; height:100%;
@@ -308,6 +342,9 @@
   <canvas id="bird-canvas"></canvas>
   <div id="word-reveal"></div>
   <div id="floating-word"></div>
+  <div id="wish-input-wrap">
+    <input type="text" id="wish-input" placeholder="write down your wish" maxlength="80" autocomplete="off">
+  </div>
 
   <div id="privacy">This stays only within you. Nothing you write is ever sent or saved.</div>
 
@@ -520,6 +557,10 @@
     moonEl.classList.remove('lit');
     const _wr = document.getElementById('word-reveal');
     if(_wr) _wr.innerHTML = '';
+    const _ww = document.getElementById('wish-input-wrap');
+    if(_ww){ _ww.style.opacity = 0; _ww.style.pointerEvents = 'none'; }
+    const _wi = document.getElementById('wish-input');
+    if(_wi) _wi.value = '';
     if(audioPlaying){ furusatoAudio.pause(); furusatoAudio.currentTime=0; audioPlaying=false; soundToggle.textContent='Listen, softly'; }
     setLine('', '');
     setTimeout(()=>{
@@ -1437,10 +1478,15 @@
       bctx.restore();
     }
 
-    // ── カシオペア座（milkyWayT > 0 で出現）──
+    // ── カシオペア座（milkyWayT > 0 で出現・鷹が消えた後に中央へ移動）──
     if(milkyWayT > 0){
-      // カシオペア座のW字：右寄せ・縦長（X1.8倍・Y2.4倍）
-      const cassCX = 0.58, cassCY = 0.125;
+      // ct0=14〜18s で中心X: 0.58（右）→ 0.50（中央）へ easeInOut 補間
+      const cassMoveT = Math.min(Math.max((ct0 - 14) / 4, 0), 1);
+      const easedMove = cassMoveT < 0.5
+        ? 2 * cassMoveT * cassMoveT
+        : 1 - Math.pow(-2 * cassMoveT + 2, 2) / 2;
+      const cassCX = 0.58 - easedMove * 0.08; // 0.58 → 0.50
+      const cassCY = 0.18;
       const cassScaleX = 1.8, cassScaleY = 2.4;
       const cassStars = [
         {rx:0.12, ry:0.14},
@@ -1465,8 +1511,7 @@
       // 各星（サイズも1.8倍）
       cassStars.forEach((s, si)=>{
         const twinkle = 0.6 + 0.4 * Math.sin(t*1.2 + si*1.8);
-        const starR = ((si===1||si===3) ? 2.4 : 1.8) * 1.8; // 1.8倍
-        // 輝きグロー
+        const starR = ((si===1||si===3) ? 2.4 : 1.8) * 1.8;
         const sg = bctx.createRadialGradient(s.rx*w, s.ry*h, 0, s.rx*w, s.ry*h, starR*4);
         sg.addColorStop(0,   `rgba(200,220,255,${milkyWayT*twinkle*0.9})`);
         sg.addColorStop(0.4, `rgba(140,180,255,${milkyWayT*twinkle*0.4})`);
@@ -1475,14 +1520,13 @@
         bctx.arc(s.rx*w, s.ry*h, starR*4, 0, Math.PI*2);
         bctx.fillStyle = sg;
         bctx.fill();
-        // 星本体
         bctx.beginPath();
         bctx.arc(s.rx*w, s.ry*h, starR * twinkle, 0, Math.PI*2);
         bctx.fillStyle = `rgba(220,235,255,${milkyWayT * twinkle})`;
         bctx.fill();
       });
 
-      // カシオペア座の下にテキスト
+      // カシオペア座の下に "Destruction and Rebirth"
       const cassMaxY = Math.max(...cassStars.map(s => s.ry)) * h;
       const cassMinX = Math.min(...cassStars.map(s => s.rx)) * w;
       const cassMaxX = Math.max(...cassStars.map(s => s.rx)) * w;
@@ -1500,6 +1544,26 @@
       bctx.restore();
 
       bctx.restore();
+
+      // ct0=18s 以降：wish入力欄をフェードイン表示（cassMidX/cassMaxYをDOMに反映）
+      const wishWrap = document.getElementById('wish-input-wrap');
+      if(ct0 >= 18){
+        const wishAlpha = Math.min((ct0 - 18) / 2, 1);
+        wishWrap.style.opacity = wishAlpha;
+        wishWrap.style.pointerEvents = wishAlpha > 0.5 ? 'auto' : 'none';
+        // 入力欄をカシオペア座の下・"Destruction and Rebirth" テキストのさらに下に配置
+        const wrapTopPx = textY + h * 0.06;
+        wishWrap.style.top = `${wrapTopPx}px`;
+        wishWrap.style.left = `${cassMidX}px`;
+      } else {
+        wishWrap.style.opacity = 0;
+        wishWrap.style.pointerEvents = 'none';
+      }
+    } else {
+      // milkyWayT=0 のときは入力欄を非表示
+      const wishWrap = document.getElementById('wish-input-wrap');
+      wishWrap.style.opacity = 0;
+      wishWrap.style.pointerEvents = 'none';
     }
 
     // 湖面の反射（夜明けは橙〜赤）
@@ -2209,9 +2273,11 @@
     if(e.key === 'Enter'){ finishWithWord(wordInput.value); }
   });
   wordInput.addEventListener('click', (e)=> e.stopPropagation());
+  document.getElementById('wish-input').addEventListener('click', (e)=> e.stopPropagation());
+  document.getElementById('wish-input-wrap').addEventListener('click', (e)=> e.stopPropagation());
 
   stage.addEventListener('click', (e)=>{
-    if(e.target.closest('#choice-row') || e.target.closest('#input-row') || e.target.closest('#hidden-scene')) return;
+    if(e.target.closest('#choice-row') || e.target.closest('#input-row') || e.target.closest('#hidden-scene') || e.target.closest('#wish-input-wrap')) return;
     if(scene==='intro') goBerries();
     else if(scene==='prompt') goBerries();
     else if(scene==='berries-wait') goRelease();
