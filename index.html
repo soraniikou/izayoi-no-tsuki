@@ -163,12 +163,12 @@
   #back-btn{
     position:absolute; bottom:4vh; right:5vw;
     font-family:'Zen Kaku Gothic New', sans-serif;
-    font-weight:300;
+    font-weight:400;
     font-size: 12px;
     letter-spacing:0.15em;
-    color: rgba(200,205,225,0.75);
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(200,205,225,0.18);
+    color: rgba(235,240,255,0.95);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(220,228,255,0.35);
     border-radius: 16px;
     padding: 6px 18px;
     cursor: pointer;
@@ -182,7 +182,31 @@
     opacity:1;
     pointer-events: auto;
   }
-  #back-btn:hover{ background: rgba(255,255,255,0.12); color: rgba(220,225,245,1); }
+  #back-btn:hover{ background: rgba(255,255,255,0.18); color: rgba(255,255,255,1); }
+
+  #next-btn{
+    position:absolute; bottom:4vh; left:50%; transform:translateX(-50%);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:400;
+    font-size: 12px;
+    letter-spacing:0.18em;
+    color: rgba(235,240,255,0.95);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(220,228,255,0.35);
+    border-radius: 16px;
+    padding: 6px 24px;
+    cursor: pointer;
+    opacity:0;
+    transition: opacity 0.8s ease, background 0.3s ease;
+    z-index:20;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #next-btn.show{
+    opacity:1;
+    pointer-events: auto;
+  }
+  #next-btn:hover{ background: rgba(255,255,255,0.18); color: rgba(255,255,255,1); }
   @keyframes pulse{
     0%,100%{ opacity:0.7; } 50%{ opacity:1; }
   }
@@ -300,6 +324,7 @@
     </div>
   </div>
   <button id="back-btn">← Back</button>
+  <button id="next-btn">Next →</button>
 
   <div id="hidden-scene">
     <canvas id="highland-canvas"></canvas>
@@ -448,6 +473,11 @@
     e.stopPropagation();
     if(backBtn.classList.contains('show')) goIntro();
   });
+  const nextBtn = document.getElementById('next-btn');
+  nextBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if(nextBtn.classList.contains('show')){ nextBtn.classList.remove('show'); goBerries(); }
+  });
   const moonEl = document.getElementById('moon');
   const floatingWord = document.getElementById('floating-word');
   const stage = document.getElementById('stage');
@@ -478,6 +508,7 @@
     scene='intro';
     hideChoices();
     backBtn.classList.remove('show');
+    nextBtn.classList.remove('show');
     hiddenScene.classList.remove('show');
     document.getElementById('word-reveal').classList.remove('bird-size');
     if(highlandRAF){ cancelAnimationFrame(highlandRAF); highlandRAF=null; hctx.clearRect(0,0,window.innerWidth,window.innerHeight); }
@@ -493,6 +524,7 @@
     setLine('', '');
     setTimeout(()=>{
       setLine('Buck Moon.', '');
+      setTimeout(()=> nextBtn.classList.add('show'), 1800);
     }, 600);
   }
 
@@ -550,6 +582,7 @@
     scene='berries';
     hideChoices();
     backBtn.classList.add('show');
+    nextBtn.classList.remove('show');
     cctx.clearRect(0,0,W,H);
     particles = [];
     moonEl.classList.remove('lit');
