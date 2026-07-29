@@ -40,11 +40,14 @@
     width: 34vmin; height:34vmin;
     z-index:2;
   }
-  /* スマホ（縦持ち）：月が画面上部で切れないよう下に移動 */
+  /* スマホ（縦持ち）：月が画面上部で切れないよう下に移動 / Nextを上へ */
   @media (max-width: 600px) and (orientation: portrait),
          (max-height: 700px) and (orientation: portrait) {
     #moon-wrap{
       top: 36%;
+    }
+    #next-btn{
+      bottom: calc(12vh + env(safe-area-inset-bottom, 0px));
     }
   }
   #moon-glow{
@@ -1485,20 +1488,34 @@
 
     // ── カシオペア座（天の川と同時に画面中央に出現）──
     if(milkyWayT > 0){
-      // 最初から画面中央に固定（移動アニメーションなし）
-      const cassCX = 0.50;
-      const cassCY = 0.18;
-      const cassScaleX = 1.8, cassScaleY = 2.4;
-      const cassStars = [
+      // スマホ縦持ちのみ：画面中央へ寄せて切れないサイズに調整
+      const isMobileCass = w <= 600 || (w < h && h <= 900);
+      const cassBase = [
         {rx:0.12, ry:0.14},
         {rx:0.22, ry:0.08},
         {rx:0.32, ry:0.15},
         {rx:0.42, ry:0.09},
         {rx:0.52, ry:0.17},
-      ].map(s=>({
-        rx: cassCX + (s.rx - cassCX) * cassScaleX,
-        ry: cassCY + (s.ry - cassCY) * cassScaleY,
-      }));
+      ];
+      let cassCX, cassCY, cassScaleX, cassScaleY, cassStars;
+      if(isMobileCass){
+        // 画面中央・やや小さめ（切れ防止）
+        cassCX = 0.50; cassCY = 0.38;
+        cassScaleX = 1.15; cassScaleY = 1.45;
+        const cassRefX = 0.32, cassRefY = 0.125;
+        cassStars = cassBase.map(s=>({
+          rx: cassCX + (s.rx - cassRefX) * cassScaleX,
+          ry: cassCY + (s.ry - cassRefY) * cassScaleY,
+        }));
+      } else {
+        // デスクトップ：従来どおり
+        cassCX = 0.50; cassCY = 0.18;
+        cassScaleX = 1.8; cassScaleY = 2.4;
+        cassStars = cassBase.map(s=>({
+          rx: cassCX + (s.rx - cassCX) * cassScaleX,
+          ry: cassCY + (s.ry - cassCY) * cassScaleY,
+        }));
+      }
       bctx.save();
       // 結ぶ線
       bctx.beginPath();
@@ -1532,8 +1549,10 @@
       const cassMinX = Math.min(...cassStars.map(s => s.rx)) * w;
       const cassMaxX = Math.max(...cassStars.map(s => s.rx)) * w;
       const cassMidX = (cassMinX + cassMaxX) / 2;
-      const textY    = cassMaxY + h * 0.06;
-      const fontSize = Math.max(11, Math.min(w, h) * 0.022);
+      const textY    = cassMaxY + h * (isMobileCass ? 0.045 : 0.06);
+      const fontSize = isMobileCass
+        ? Math.max(12, Math.min(w, h) * 0.028)
+        : Math.max(11, Math.min(w, h) * 0.022);
       bctx.save();
       bctx.font = `300 ${fontSize}px 'Zen Kaku Gothic New', sans-serif`;
       bctx.letterSpacing = '0.12em';
@@ -1553,7 +1572,7 @@
         wishWrap.style.opacity = wishAlpha;
         wishWrap.style.pointerEvents = wishAlpha > 0.5 ? 'auto' : 'none';
         // 入力欄をカシオペア座の下・"Destruction and Rebirth" テキストのさらに下に配置
-        const wrapTopPx = textY + h * 0.06;
+        const wrapTopPx = textY + h * (isMobileCass ? 0.05 : 0.06);
         wishWrap.style.top = `${wrapTopPx}px`;
         wishWrap.style.left = `${cassMidX}px`;
       } else {
