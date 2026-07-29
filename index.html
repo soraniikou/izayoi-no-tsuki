@@ -542,6 +542,7 @@
   }
 
   function goIntro(){
+    console.log('[goIntro] called, previous scene=' + scene, new Error().stack.split('\n')[2]);
     scene='intro';
     hideChoices();
     backBtn.classList.remove('show');
@@ -953,6 +954,7 @@
               requestAnimationFrame(fadeOut);
             } else {
               cctx.clearRect(0, 0, W, H);
+              console.log('[moonToClover] calling goBirdScene, scene=' + scene);
               goBirdScene();
             }
           }
@@ -1236,6 +1238,7 @@
 
   function drawBirdScene(t){
     const w = W, h = H;
+    if(t < 0.1) console.log('[drawBirdScene] first call t=' + t.toFixed(3) + ' W=' + w + ' H=' + h);
     bctx.clearRect(0, 0, w, h);
 
     // ────────────────────────────────────
@@ -1323,6 +1326,10 @@
       });
     }
 
+    // フェーズC内で天の川への移行進行度（ct>=6 から 4秒かけてフェード）
+    const ct0 = inC ? (t - PHASE_B_END) : 0;
+    const milkyWayT = inC ? Math.min(Math.max((ct0 - 6) / 4, 0), 1) : 0;
+
     // ── 三日月（夜明けとともに薄れ、天の川フェーズで完全に消える）──
     const moonFadeOut = Math.max(0, 1 - dawnT/0.8) * (1 - milkyWayT);
     if(moonFadeOut > 0.01){
@@ -1343,9 +1350,6 @@
       bctx.restore();
     }
 
-    // フェーズC内で天の川への移行進行度（ct>=6 から 4秒かけてフェード）
-    const ct0 = inC ? (t - PHASE_B_END) : 0;
-    const milkyWayT = inC ? Math.min(Math.max((ct0 - 6) / 4, 0), 1) : 0;
     // 山のフェードアウト（ct>=6 から消える）
     const hillAlpha = 1 - milkyWayT;
 
@@ -1819,12 +1823,26 @@
     // bird-canvas をフェードイン
     birdCanvas.classList.add('show');
 
+    // ── デバッグ: goBirdScene 開始時の状態確認 ──
+    console.log('[goBirdScene] called');
+    console.log('[goBirdScene] birdCanvas.width=' + birdCanvas.width + ' height=' + birdCanvas.height);
+    console.log('[goBirdScene] classList=' + birdCanvas.className);
+    console.log('[goBirdScene] W=' + W + ' H=' + H + ' DPR=' + DPR);
+    const cs = window.getComputedStyle(birdCanvas);
+    console.log('[goBirdScene] computed opacity=' + cs.opacity + ' zIndex=' + cs.zIndex + ' display=' + cs.display);
+
     // アニメーションループ開始
     if(birdRAF) cancelAnimationFrame(birdRAF);
     birdSceneStart = null;
+    let _dbgFrameCount = 0;
     function bLoop(ts){
       if(!birdSceneStart) birdSceneStart = ts;
-      drawBirdScene((ts - birdSceneStart)/1000);
+      const elapsed = (ts - birdSceneStart)/1000;
+      if(_dbgFrameCount < 5){
+        console.log('[bLoop] frame=' + _dbgFrameCount + ' t=' + elapsed.toFixed(3));
+        _dbgFrameCount++;
+      }
+      drawBirdScene(elapsed);
       birdRAF = requestAnimationFrame(bLoop);
     }
     birdRAF = requestAnimationFrame(bLoop);
